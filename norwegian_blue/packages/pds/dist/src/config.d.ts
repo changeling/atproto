@@ -1,0 +1,50 @@
+export interface ServerConfigValues {
+    debugMode?: boolean;
+    version: string;
+    publicUrl?: string;
+    scheme: string;
+    port?: number;
+    hostname: string;
+    dbPostgresUrl?: string;
+    dbPostgresSchema?: string;
+    jwtSecret: string;
+    didPlcUrl: string;
+    serverDid: string;
+    recoveryKey: string;
+    adminPassword: string;
+    inviteRequired: boolean;
+    blockstoreLocation?: string;
+    databaseLocation?: string;
+    availableUserDomains: string[];
+    appUrlPasswordReset: string;
+    emailSmtpUrl?: string;
+    emailNoReplyAddress: string;
+}
+export declare class ServerConfig {
+    private cfg;
+    constructor(cfg: ServerConfigValues);
+    static readEnv(overrides?: Partial<ServerConfigValues>): ServerConfig;
+    get debugMode(): boolean | undefined;
+    get version(): string;
+    get scheme(): string;
+    get port(): number | undefined;
+    get hostname(): string;
+    get origin(): string;
+    get publicUrl(): string;
+    get dbPostgresUrl(): string | undefined;
+    get dbPostgresSchema(): string | undefined;
+    get jwtSecret(): string;
+    get didPlcUrl(): string;
+    get serverDid(): string;
+    get recoveryKey(): string;
+    get adminPassword(): string;
+    get inviteRequired(): boolean;
+    get blockstoreLocation(): string | undefined;
+    get useMemoryBlockstore(): boolean;
+    get databaseLocation(): string | undefined;
+    get useMemoryDatabase(): boolean;
+    get availableUserDomains(): string[];
+    get appUrlPasswordReset(): string;
+    get emailSmtpUrl(): string | undefined;
+    get emailNoReplyAddress(): string;
+}

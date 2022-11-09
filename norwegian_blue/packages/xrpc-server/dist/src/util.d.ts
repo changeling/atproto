@@ -1,0 +1,12 @@
+import express from 'express';
+import { MethodSchema } from '@atproto/lexicon';
+import Ajv, { ValidateFunction } from 'ajv';
+import { Params, HandlerInput, HandlerSuccess } from './types';
+export declare const ajv: Ajv;
+declare type ReqQuery = typeof express.request['query'];
+export declare function validateReqParams(schema: MethodSchema, reqParams: ReqQuery): Params;
+export declare function validateInput(schema: MethodSchema, req: express.Request, inputBodyBuf: Uint8Array, jsonValidator?: ValidateFunction): HandlerInput | undefined;
+export declare function validateOutput(schema: MethodSchema, output: HandlerSuccess | undefined, jsonValidator?: ValidateFunction): HandlerSuccess | undefined;
+export declare function normalizeMime(v: string): any;
+export declare function readReqBody(req: express.Request): Promise<Uint8Array>;
+export {};

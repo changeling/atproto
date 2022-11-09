@@ -1,0 +1,31 @@
+{
+  "name": "@atproto/dev-env",
+  "version": "0.0.1",
+  "main": "dist/cli.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "node ./build.js",
+    "postbuild" : "tsc --build tsconfig.build.json",
+    "start": "node dist/cli.js",
+    "prettier": "prettier --check src/",
+    "prettier:fix": "prettier --write src/",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "yarn lint --fix",
+    "verify": "run-p prettier lint",
+    "verify:fix": "yarn prettier:fix && yarn lint:fix"
+  },
+  "dependencies": {
+    "@atproto/api": "*",
+    "@atproto/crypto": "*",
+    "@atproto/did-resolver": "*",
+    "@atproto/pds": "*",
+    "@atproto/uri": "*",
+    "chalk": "^5.0.1",
+    "dotenv": "^16.0.1",
+    "get-port": "^6.1.2"
+  },
+  "devDependencies": {
+    "esbuild-plugin-copy": "^1.3.0",
+    "ts-node": "^10.8.1"
+  }
+}

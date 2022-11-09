@@ -1,0 +1,20 @@
+{
+  "name": "@atproto/api",
+  "version": "0.0.1",
+  "main": "src/index.ts",
+  "scripts": {
+    "codegen": "lex gen-api ./src/client ../../lexicons/com/atproto/*/* ../../lexicons/app/bsky/*/*",
+    "build": "esbuild src/index.ts --define:process.env.NODE_ENV=\\\"production\\\" --bundle --platform=node --sourcemap --outfile=dist/index.js",
+    "postbuild": "tsc --build tsconfig.build.json",
+    "test": "jest"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@atproto/xrpc": "*",
+    "typed-emitter": "^2.1.0"
+  },
+  "devDependencies": {
+    "@atproto/lex-cli": "*",
+    "@atproto/pds": "*"
+  }
+}
