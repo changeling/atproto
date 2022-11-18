@@ -2,7 +2,7 @@ import { DevEnv } from '../index'
 import { ServerType } from '../types'
 import { genServerCfg } from '../util'
 import { AtUri } from '@atproto/uri'
-import { ServiceClient } from '@atproto/api'
+import { ServiceClient, APP_BSKY_GRAPH } from '@atproto/api'
 import { postTexts, replyTexts } from './data'
 
 // NOTE
@@ -89,9 +89,12 @@ export async function generateMockSetup(env: DevEnv) {
       handle: user.handle,
       password: user.password,
     })
-    user.did = res.data.did
-    user.declarationCid = res.data.declarationCid
     user.api.setHeader('Authorization', `Bearer ${res.data.accessJwt}`)
+    const { data: profile } = await user.api.app.bsky.actor.getProfile({
+      actor: user.handle,
+    })
+    user.did = res.data.did
+    user.declarationCid = profile.declaration.cid
     await user.api.app.bsky.actor.profile.create(
       { did: user.did },
       {
@@ -120,6 +123,65 @@ export async function generateMockSetup(env: DevEnv) {
   await follow(bob, carla)
   await follow(carla, alice)
   await follow(carla, bob)
+
+  // everybody's in the "besties" scene
+  const bestiesScene = await alice.api.app.bsky.actor.createScene({
+    handle: 'besties.test',
+  })
+  {
+    const invite = await alice.api.app.bsky.graph.assertion.create(
+      { did: bestiesScene.data.did },
+      {
+        assertion: APP_BSKY_GRAPH.AssertMember,
+        subject: {
+          did: bob.did,
+          declarationCid: bob.declarationCid,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    )
+    await bob.api.app.bsky.graph.confirmation.create(
+      { did: bob.did },
+      {
+        originator: {
+          did: bestiesScene.data.did,
+          declarationCid: bestiesScene.data.declaration.cid,
+        },
+        assertion: {
+          uri: invite.uri,
+          cid: invite.cid,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    )
+  }
+  {
+    const invite = await alice.api.app.bsky.graph.assertion.create(
+      { did: bestiesScene.data.did },
+      {
+        assertion: APP_BSKY_GRAPH.AssertMember,
+        subject: {
+          did: carla.did,
+          declarationCid: carla.declarationCid,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    )
+    await carla.api.app.bsky.graph.confirmation.create(
+      { did: carla.did },
+      {
+        originator: {
+          did: bestiesScene.data.did,
+          declarationCid: bestiesScene.data.declaration.cid,
+        },
+        assertion: {
+          uri: invite.uri,
+          cid: invite.cid,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    )
+  }
 
   // a set of posts and reposts
   const posts: { uri: string; cid: string }[] = []
@@ -170,13 +232,14 @@ export async function generateMockSetup(env: DevEnv) {
     )
   }
 
-  // a set of likes
+  // a set of up/downvotes
   for (const post of posts) {
     for (const user of users) {
       if (rand(3) === 0) {
-        await user.api.app.bsky.feed.like.create(
+        await user.api.app.bsky.feed.vote.create(
           { did: user.did },
           {
+            direction: rand(3) !== 0 ? 'up' : 'down',
             subject: post,
             createdAt: date.next().value,
           },

@@ -2,7 +2,8 @@ import { Kysely, sql } from 'kysely'
 import { Dialect } from '..'
 
 const userTable = 'user'
-const userDidTable = 'user_did'
+const didHandleTable = 'did_handle'
+const sceneTable = 'scene'
 const refreshTokenTable = 'refresh_token'
 const repoRootTable = 'repo_root'
 const recordTable = 'record'
@@ -11,15 +12,19 @@ const ipldBlockCreatorTable = 'ipld_block_creator'
 const inviteCodeTable = 'invite_code'
 const inviteUseTable = 'invite_code_use'
 const notificationTable = 'user_notification'
-const declarationTable = 'app_bsky_declaration'
-const profileTable = 'app_bsky_profile'
-const inviteTable = 'app_bsky_invite'
-const inviteAcceptTable = 'app_bsky_invite_accept'
-const followTable = 'app_bsky_follow'
-const postTable = 'app_bsky_post'
-const postEntityTable = 'app_bsky_post_entity'
-const repostTable = 'app_bsky_repost'
-const likeTable = 'app_bsky_like'
+const assertionTable = 'assertion'
+const profileTable = 'profile'
+const confirmationTable = 'confirmation'
+const followTable = 'follow'
+const postTable = 'post'
+const postEntityTable = 'post_entity'
+const repostTable = 'repost'
+const trendTable = 'trend'
+const voteTable = 'vote'
+const messageQueueTable = 'message_queue'
+const messageQueueCursorTable = 'message_queue_cursor'
+const sceneMemberCountTable = 'scene_member_count'
+const sceneVotesOnPostTable = 'scene_votes_on_post'
 
 export async function up(db: Kysely<unknown>, dialect: Dialect): Promise<void> {
   if (dialect === 'pg') {
@@ -54,26 +59,35 @@ export async function up(db: Kysely<unknown>, dialect: Dialect): Promise<void> {
     .on(userTable)
     .expression(sql`lower("email")`)
     .execute()
-  // User Dids
+  // Did Handle
   await db.schema
-    .createTable(userDidTable)
+    .createTable(didHandleTable)
     .addColumn('did', 'varchar', (col) => col.primaryKey())
     .addColumn('handle', 'varchar', (col) => col.unique())
+    .addColumn('actorType', 'varchar')
+    .addColumn('declarationCid', 'varchar')
     .execute()
   await db.schema
-    .createIndex(`${userDidTable}_handle_lower_idx`)
+    .createIndex(`${didHandleTable}_handle_lower_idx`)
     .unique()
-    .on(userDidTable)
+    .on(didHandleTable)
     .expression(sql`lower("handle")`)
     .execute()
   if (dialect === 'pg') {
     await db.schema // Supports user search
-      .createIndex(`${userDidTable}_handle_tgrm_idx`)
-      .on(userDidTable)
+      .createIndex(`${didHandleTable}_handle_tgrm_idx`)
+      .on(didHandleTable)
       .using('gist')
       .expression(sql`"handle" gist_trgm_ops`)
       .execute()
   }
+  // Scenes
+  await db.schema
+    .createTable(sceneTable)
+    .addColumn('handle', 'varchar', (col) => col.primaryKey())
+    .addColumn('owner', 'varchar', (col) => col.notNull())
+    .addColumn('createdAt', 'varchar', (col) => col.notNull())
+    .execute()
   // Refresh Tokens
   await db.schema
     .createTable(refreshTokenTable)
@@ -141,14 +155,21 @@ export async function up(db: Kysely<unknown>, dialect: Dialect): Promise<void> {
     .addColumn('reasonSubject', 'varchar')
     .addColumn('indexedAt', 'varchar', (col) => col.notNull())
     .execute()
-  // Declarations
+  // Assertions
   await db.schema
-    .createTable(declarationTable)
+    .createTable(assertionTable)
     .addColumn('uri', 'varchar', (col) => col.primaryKey())
     .addColumn('cid', 'varchar', (col) => col.notNull())
     .addColumn('creator', 'varchar', (col) => col.notNull())
-    .addColumn('actorType', 'varchar', (col) => col.notNull())
+    .addColumn('assertion', 'varchar', (col) => col.notNull())
+    .addColumn('subjectDid', 'varchar', (col) => col.notNull())
+    .addColumn('subjectDeclarationCid', 'varchar', (col) => col.notNull())
+    .addColumn('createdAt', 'varchar', (col) => col.notNull())
     .addColumn('indexedAt', 'varchar', (col) => col.notNull())
+    .addColumn('confirmUri', 'varchar')
+    .addColumn('confirmCid', 'varchar')
+    .addColumn('confirmCreated', 'varchar')
+    .addColumn('confirmIndexed', 'varchar')
     .execute()
   // Profiles
   await db.schema
@@ -168,30 +189,6 @@ export async function up(db: Kysely<unknown>, dialect: Dialect): Promise<void> {
       .expression(sql`"displayName" gist_trgm_ops`)
       .execute()
   }
-  // Invites (Records)
-  await db.schema
-    .createTable(inviteTable)
-    .addColumn('uri', 'varchar', (col) => col.primaryKey())
-    .addColumn('cid', 'varchar', (col) => col.notNull())
-    .addColumn('creator', 'varchar', (col) => col.notNull())
-    .addColumn('group', 'varchar', (col) => col.notNull())
-    .addColumn('subjectDid', 'varchar', (col) => col.notNull())
-    .addColumn('subjectDeclarationCid', 'varchar', (col) => col.notNull())
-    .addColumn('createdAt', 'varchar', (col) => col.notNull())
-    .addColumn('indexedAt', 'varchar', (col) => col.notNull())
-    .execute()
-  await db.schema
-    .createTable(inviteAcceptTable)
-    .addColumn('uri', 'varchar', (col) => col.primaryKey())
-    .addColumn('cid', 'varchar', (col) => col.notNull())
-    .addColumn('creator', 'varchar', (col) => col.notNull())
-    .addColumn('groupDid', 'varchar', (col) => col.notNull())
-    .addColumn('groupDeclarationCid', 'varchar', (col) => col.notNull())
-    .addColumn('inviteUri', 'varchar', (col) => col.notNull())
-    .addColumn('inviteCid', 'varchar', (col) => col.notNull())
-    .addColumn('createdAt', 'varchar', (col) => col.notNull())
-    .addColumn('indexedAt', 'varchar', (col) => col.notNull())
-    .execute()
   // Follows
   await db.schema
     .createTable(followTable)
@@ -236,7 +233,7 @@ export async function up(db: Kysely<unknown>, dialect: Dialect): Promise<void> {
     .addColumn('indexedAt', 'varchar', (col) => col.notNull())
     .execute()
   await db.schema
-    .createTable(likeTable)
+    .createTable(trendTable)
     .addColumn('uri', 'varchar', (col) => col.primaryKey())
     .addColumn('cid', 'varchar', (col) => col.notNull())
     .addColumn('creator', 'varchar', (col) => col.notNull())
@@ -245,18 +242,66 @@ export async function up(db: Kysely<unknown>, dialect: Dialect): Promise<void> {
     .addColumn('createdAt', 'varchar', (col) => col.notNull())
     .addColumn('indexedAt', 'varchar', (col) => col.notNull())
     .execute()
+  await db.schema
+    .createTable(voteTable)
+    .addColumn('uri', 'varchar', (col) => col.primaryKey())
+    .addColumn('cid', 'varchar', (col) => col.notNull())
+    .addColumn('creator', 'varchar', (col) => col.notNull())
+    .addColumn('direction', 'varchar', (col) => col.notNull())
+    .addColumn('subject', 'varchar', (col) => col.notNull())
+    .addColumn('subjectCid', 'varchar', (col) => col.notNull())
+    .addColumn('createdAt', 'varchar', (col) => col.notNull())
+    .addColumn('indexedAt', 'varchar', (col) => col.notNull())
+    .execute()
+
+  let mqBuilder = db.schema.createTable(messageQueueTable)
+  mqBuilder =
+    dialect === 'pg'
+      ? mqBuilder.addColumn('id', 'serial', (col) => col.primaryKey())
+      : mqBuilder.addColumn('id', 'integer', (col) =>
+          col.autoIncrement().primaryKey(),
+        )
+  mqBuilder
+    .addColumn('message', 'varchar', (col) => col.notNull())
+    .addColumn('createdAt', 'varchar', (col) => col.notNull())
+    .execute()
+  await db.schema
+    .createTable(messageQueueCursorTable)
+    .addColumn('consumer', 'varchar', (col) => col.primaryKey())
+    .addColumn('cursor', 'integer', (col) => col.notNull())
+    .execute()
+  await db.schema
+    .createTable(sceneMemberCountTable)
+    .addColumn('did', 'varchar', (col) => col.primaryKey())
+    .addColumn('count', 'integer', (col) => col.notNull())
+    .execute()
+  await db.schema
+    .createTable(sceneVotesOnPostTable)
+    .addColumn('did', 'varchar', (col) => col.notNull())
+    .addColumn('subject', 'varchar', (col) => col.notNull())
+    .addColumn('count', 'integer', (col) => col.notNull())
+    .addColumn('postedTrending', 'int2', (col) => col.notNull())
+    .addPrimaryKeyConstraint(`${sceneVotesOnPostTable}_pkey`, [
+      'did',
+      'subject',
+    ])
+    .execute()
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {
-  await db.schema.dropTable(likeTable).execute()
+  await db.schema.dropTable(sceneVotesOnPostTable).execute()
+  await db.schema.dropTable(sceneMemberCountTable).execute()
+  await db.schema.dropTable(messageQueueCursorTable).execute()
+  await db.schema.dropTable(messageQueueTable).execute()
+  await db.schema.dropTable(voteTable).execute()
+  await db.schema.dropTable(trendTable).execute()
   await db.schema.dropTable(repostTable).execute()
   await db.schema.dropTable(postEntityTable).execute()
   await db.schema.dropTable(postTable).execute()
   await db.schema.dropTable(followTable).execute()
-  await db.schema.dropTable(inviteAcceptTable).execute()
-  await db.schema.dropTable(inviteTable).execute()
+  await db.schema.dropTable(confirmationTable).execute()
+  await db.schema.dropTable(assertionTable).execute()
   await db.schema.dropTable(profileTable).execute()
-  await db.schema.dropTable(declarationTable).execute()
   await db.schema.dropTable(notificationTable).execute()
   await db.schema.dropTable(inviteUseTable).execute()
   await db.schema.dropTable(inviteCodeTable).execute()
@@ -264,6 +309,6 @@ export async function down(db: Kysely<unknown>): Promise<void> {
   await db.schema.dropTable(ipldBlockTable).execute()
   await db.schema.dropTable(recordTable).execute()
   await db.schema.dropTable(repoRootTable).execute()
-  await db.schema.dropTable(userDidTable).execute()
+  await db.schema.dropTable(didHandleTable).execute()
   await db.schema.dropTable(userTable).execute()
 }

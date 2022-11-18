@@ -3,7 +3,7 @@ import { AuthRequiredError } from '@atproto/xrpc-server'
 import { Server } from '../../../../lexicon'
 import * as GetAuthorFeed from '../../../../lexicon/types/app/bsky/feed/getAuthorFeed'
 import * as locals from '../../../../locals'
-import { rowToFeedItem } from '../util/feed'
+import { FeedItemType, rowToFeedItem } from '../util/feed'
 import { countAll, paginate } from '../../../../db/util'
 
 export default function (server: Server) {
@@ -19,20 +19,20 @@ export default function (server: Server) {
       }
 
       const userLookupCol = author.startsWith('did:')
-        ? 'user_did.did'
-        : 'user_did.handle'
+        ? 'did_handle.did'
+        : 'did_handle.handle'
       const userQb = db.db
-        .selectFrom('user_did')
+        .selectFrom('did_handle')
         .selectAll()
         .where(userLookupCol, '=', author)
 
       const postsQb = db.db
-        .selectFrom('app_bsky_post')
+        .selectFrom('post')
         .whereExists(
-          userQb.whereRef('user_did.did', '=', ref('app_bsky_post.creator')),
+          userQb.whereRef('did_handle.did', '=', ref('post.creator')),
         )
         .select([
-          sql<'post' | 'repost'>`${'post'}`.as('type'),
+          sql<FeedItemType>`${'post'}`.as('type'),
           'uri as postUri',
           'cid as postCid',
           'creator as originatorDid',
@@ -40,31 +40,48 @@ export default function (server: Server) {
         ])
 
       const repostsQb = db.db
-        .selectFrom('app_bsky_repost')
+        .selectFrom('repost')
         .whereExists(
-          userQb.whereRef('user_did.did', '=', ref('app_bsky_repost.creator')),
+          userQb.whereRef('did_handle.did', '=', ref('repost.creator')),
         )
         .select([
-          sql<'post' | 'repost'>`${'repost'}`.as('type'),
+          sql<FeedItemType>`${'repost'}`.as('type'),
           'subject as postUri',
           'subjectCid as postCid',
           'creator as originatorDid',
           'indexedAt as cursor',
         ])
 
-      let postsAndRepostsQb = db.db
-        .selectFrom(postsQb.union(repostsQb).as('posts_and_reposts'))
-        .innerJoin('app_bsky_post as post', 'post.uri', 'postUri')
+      const trendsQb = db.db
+        .selectFrom('trend')
+        .whereExists(
+          userQb.whereRef('did_handle.did', '=', ref('trend.creator')),
+        )
+        .select([
+          sql<FeedItemType>`${'trend'}`.as('type'),
+          'subject as postUri',
+          'subjectCid as postCid',
+          'creator as originatorDid',
+          'indexedAt as cursor',
+        ])
+
+      let feedItemsQb = db.db
+        .selectFrom(postsQb.union(repostsQb).union(trendsQb).as('feed_items'))
+        .innerJoin('post', 'post.uri', 'postUri')
         .innerJoin('ipld_block', 'ipld_block.cid', 'post.cid')
-        .innerJoin('user_did as author', 'author.did', 'post.creator')
+        .innerJoin('did_handle as author', 'author.did', 'post.creator')
         .leftJoin(
-          'app_bsky_profile as author_profile',
+          'profile as author_profile',
           'author_profile.creator',
           'author.did',
         )
-        .innerJoin('user_did as originator', 'originator.did', 'originatorDid')
+        .innerJoin(
+          'did_handle as originator',
+          'originator.did',
+          'originatorDid',
+        )
         .leftJoin(
-          'app_bsky_profile as originator_profile',
+          'profile as originator_profile',
           'originator_profile.creator',
           'originatorDid',
         )
@@ -76,47 +93,68 @@ export default function (server: Server) {
           'ipld_block.content as recordBytes',
           'ipld_block.indexedAt as indexedAt',
           'author.did as authorDid',
+          'author.declarationCid as authorDeclarationCid',
+          'author.actorType as authorActorType',
           'author.handle as authorHandle',
+          'author.actorType as authorActorType',
           'author_profile.displayName as authorDisplayName',
           'originator.did as originatorDid',
+          'originator.declarationCid as originatorDeclarationCid',
+          'originator.actorType as originatorActorType',
           'originator.handle as originatorHandle',
+          'originator.actorType as originatorActorType',
           'originator_profile.displayName as originatorDisplayName',
           db.db
-            .selectFrom('app_bsky_like')
+            .selectFrom('vote')
             .whereRef('subject', '=', ref('postUri'))
+            .where('direction', '=', 'up')
             .select(countAll.as('count'))
-            .as('likeCount'),
+            .as('upvoteCount'),
           db.db
-            .selectFrom('app_bsky_repost')
+            .selectFrom('vote')
+            .whereRef('subject', '=', ref('postUri'))
+            .where('direction', '=', 'down')
+            .select(countAll.as('count'))
+            .as('downvoteCount'),
+          db.db
+            .selectFrom('repost')
             .whereRef('subject', '=', ref('postUri'))
             .select(countAll.as('count'))
             .as('repostCount'),
           db.db
-            .selectFrom('app_bsky_post')
+            .selectFrom('post')
             .whereRef('replyParent', '=', ref('postUri'))
             .select(countAll.as('count'))
             .as('replyCount'),
           db.db
-            .selectFrom('app_bsky_repost')
+            .selectFrom('repost')
             .where('creator', '=', requester)
             .whereRef('subject', '=', ref('postUri'))
             .select('uri')
             .as('requesterRepost'),
           db.db
-            .selectFrom('app_bsky_like')
+            .selectFrom('vote')
             .where('creator', '=', requester)
             .whereRef('subject', '=', ref('postUri'))
+            .where('direction', '=', 'up')
             .select('uri')
-            .as('requesterLike'),
+            .as('requesterUpvote'),
+          db.db
+            .selectFrom('vote')
+            .where('creator', '=', requester)
+            .whereRef('subject', '=', ref('postUri'))
+            .where('direction', '=', 'down')
+            .select('uri')
+            .as('requesterDownvote'),
         ])
 
-      postsAndRepostsQb = paginate(postsAndRepostsQb, {
+      feedItemsQb = paginate(feedItemsQb, {
         limit,
         before,
         by: ref('cursor'),
       })
 
-      const queryRes = await postsAndRepostsQb.execute()
+      const queryRes = await feedItemsQb.execute()
       const feed = queryRes.map(rowToFeedItem)
 
       return {

@@ -2,6 +2,7 @@ import { Server } from '../../../../lexicon'
 import * as GetRepostedBy from '../../../../lexicon/types/app/bsky/feed/getRepostedBy'
 import * as locals from '../../../../locals'
 import { paginate } from '../../../../db/util'
+import { getDeclarationSimple } from '../util'
 
 export default function (server: Server) {
   server.app.bsky.feed.getRepostedBy(
@@ -11,17 +12,15 @@ export default function (server: Server) {
       const { ref } = db.db.dynamic
 
       let builder = db.db
-        .selectFrom('app_bsky_repost as repost')
+        .selectFrom('repost')
         .where('repost.subject', '=', uri)
-        .innerJoin('user_did', 'user_did.did', 'repost.creator')
-        .leftJoin(
-          'app_bsky_profile as profile',
-          'profile.creator',
-          'user_did.did',
-        )
+        .innerJoin('did_handle', 'did_handle.did', 'repost.creator')
+        .leftJoin('profile', 'profile.creator', 'did_handle.did')
         .select([
-          'user_did.did as did',
-          'user_did.handle as handle',
+          'did_handle.did as did',
+          'did_handle.declarationCid as declarationCid',
+          'did_handle.actorType as actorType',
+          'did_handle.handle as handle',
           'profile.displayName as displayName',
           'repost.createdAt as createdAt',
           'repost.indexedAt as indexedAt',
@@ -41,6 +40,7 @@ export default function (server: Server) {
 
       const repostedBy = repostedByRes.map((row) => ({
         did: row.did,
+        declaration: getDeclarationSimple(row),
         handle: row.handle,
         displayName: row.displayName || undefined,
         createdAt: row.createdAt,

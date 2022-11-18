@@ -24,7 +24,7 @@ export const ensureValid = (
   }
 
   if (reservedSubdomains[front]) {
-    throw new InvalidHandleError('Reserved handle')
+    throw new ReservedHandleError('Reserved handle')
   }
 
   if (front.indexOf('.') > -1) {
@@ -36,6 +36,20 @@ export const ensureValid = (
     throw new InvalidHandleError('Invalid characters in handle')
   }
 }
+
+export const normalize = (handle: string): string => {
+  return handle.toLowerCase()
+}
+
+export const normalizeAndEnsureValid = (
+  handle: string,
+  availableUserDomains: string[],
+): string => {
+  const normalized = normalize(handle)
+  ensureValid(normalized, availableUserDomains)
+  return normalized
+}
+
 export const isValid = (
   handle: string,
   availableUserDomains: string[],
@@ -43,7 +57,10 @@ export const isValid = (
   try {
     ensureValid(handle, availableUserDomains)
   } catch (err) {
-    if (err instanceof InvalidHandleError) {
+    if (
+      err instanceof InvalidHandleError ||
+      err instanceof ReservedHandleError
+    ) {
       return false
     }
     throw err
@@ -52,3 +69,4 @@ export const isValid = (
 }
 
 export class InvalidHandleError extends Error {}
+export class ReservedHandleError extends Error {}

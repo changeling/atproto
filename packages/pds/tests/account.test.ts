@@ -77,7 +77,7 @@ describe('account', () => {
   it('creates an invite code', async () => {
     inviteCode = await createInviteCode(client, 1)
     const [host, code] = inviteCode.split('-')
-    expect(host).toBe(new URL(serverUrl).hostname)
+    expect(host).toBe('pds.public.url') // Hostname of public url
     expect(code.length).toBe(5)
   })
 
@@ -176,7 +176,7 @@ describe('account', () => {
         password,
         inviteCode,
       }),
-    ).rejects.toThrow('Email already taken: bob@test.com')
+    ).rejects.toThrow('Email already taken: BOB@TEST.COM')
 
     await expect(
       client.com.atproto.account.create({
@@ -399,7 +399,7 @@ describe('account', () => {
 
     const user = await db.db
       .selectFrom('user')
-      .innerJoin('user_did', 'user_did.handle', 'user.handle')
+      .innerJoin('did_handle', 'did_handle.handle', 'user.handle')
       .selectAll()
       .where('did', '=', did)
       .executeTakeFirst()

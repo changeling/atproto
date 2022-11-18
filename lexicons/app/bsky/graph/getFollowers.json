@@ -4,9 +4,13 @@
   "type": "query",
   "description": "Who is following a user?",
   "parameters": {
-    "user": {"type": "string", "required": true},
-    "limit": {"type": "number", "maximum": 100},
-    "before": {"type": "string"}
+    "type": "object",
+    "required": ["user"],
+    "properties": {
+      "user": {"type": "string"},
+      "limit": {"type": "number", "maximum": 100},
+      "before": {"type": "string"}
+    }
   },
   "output": {
     "encoding": "application/json",
@@ -16,9 +20,10 @@
       "properties": {
         "subject": {
           "type": "object",
-          "required": ["did", "handle"],
+          "required": ["did", "declaration", "handle"],
           "properties": {
             "did": {"type": "string"},
+            "declaration": {"$ref": "#/defs/declaration"},
             "handle": {"type": "string"},
             "displayName": {
               "type": "string",
@@ -31,9 +36,10 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["did", "handle", "indexedAt"],
+            "required": ["did", "declaration", "handle", "indexedAt"],
             "properties": {
               "did": {"type": "string"},
+              "declaration": {"$ref": "#/defs/declaration"},
               "handle": {"type": "string"},
               "displayName": {
                 "type": "string",
@@ -45,6 +51,29 @@
           }
         }
       }
+    }
+  },
+  "defs": {
+    "declaration": {
+      "type": "object",
+      "required": ["cid", "actorType"],
+      "properties": {
+        "cid": {"type": "string"},
+        "actorType": {
+          "oneOf": [
+            {"$ref": "#/defs/actorKnown"},
+            {"$ref": "#/defs/actorUnknown"}
+          ]
+        }
+      }
+    },
+    "actorKnown": {
+      "type": "string",
+      "enum": ["app.bsky.system.actorUser", "app.bsky.system.actorScene"]
+    },
+    "actorUnknown": {
+      "type": "string",
+      "not": {"enum": ["app.bsky.system.actorUser", "app.bsky.system.actorScene"]}
     }
   }
 }

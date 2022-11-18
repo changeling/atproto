@@ -28,21 +28,31 @@ import * as ComAtprotoSessionRefresh from './types/com/atproto/session/refresh'
 import * as ComAtprotoSyncGetRepo from './types/com/atproto/sync/getRepo'
 import * as ComAtprotoSyncGetRoot from './types/com/atproto/sync/getRoot'
 import * as ComAtprotoSyncUpdateRepo from './types/com/atproto/sync/updateRepo'
+import * as AppBskyActorCreateScene from './types/app/bsky/actor/createScene'
 import * as AppBskyActorGetProfile from './types/app/bsky/actor/getProfile'
+import * as AppBskyActorGetSuggestions from './types/app/bsky/actor/getSuggestions'
 import * as AppBskyActorSearch from './types/app/bsky/actor/search'
 import * as AppBskyActorSearchTypeahead from './types/app/bsky/actor/searchTypeahead'
 import * as AppBskyActorUpdateProfile from './types/app/bsky/actor/updateProfile'
 import * as AppBskyFeedGetAuthorFeed from './types/app/bsky/feed/getAuthorFeed'
-import * as AppBskyFeedGetLikedBy from './types/app/bsky/feed/getLikedBy'
 import * as AppBskyFeedGetPostThread from './types/app/bsky/feed/getPostThread'
 import * as AppBskyFeedGetRepostedBy from './types/app/bsky/feed/getRepostedBy'
 import * as AppBskyFeedGetTimeline from './types/app/bsky/feed/getTimeline'
+import * as AppBskyFeedGetVotes from './types/app/bsky/feed/getVotes'
+import * as AppBskyFeedSetVote from './types/app/bsky/feed/setVote'
+import * as AppBskyGraphGetAssertions from './types/app/bsky/graph/getAssertions'
 import * as AppBskyGraphGetFollowers from './types/app/bsky/graph/getFollowers'
 import * as AppBskyGraphGetFollows from './types/app/bsky/graph/getFollows'
+import * as AppBskyGraphGetMembers from './types/app/bsky/graph/getMembers'
+import * as AppBskyGraphGetMemberships from './types/app/bsky/graph/getMemberships'
 import * as AppBskyNotificationGetCount from './types/app/bsky/notification/getCount'
 import * as AppBskyNotificationList from './types/app/bsky/notification/list'
 import * as AppBskyNotificationUpdateSeen from './types/app/bsky/notification/updateSeen'
 
+export const APP_BSKY_GRAPH = {
+  AssertCreator: 'app.bsky.graph.assertCreator',
+  AssertMember: 'app.bsky.graph.assertMember',
+}
 export const APP_BSKY_SYSTEM = {
   ActorScene: 'app.bsky.system.actorScene',
   ActorUser: 'app.bsky.system.actorUser',
@@ -286,8 +296,18 @@ export class ActorNS {
     this._server = server
   }
 
+  createScene(handler: AppBskyActorCreateScene.Handler) {
+    const schema = 'app.bsky.actor.createScene' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
+
   getProfile(handler: AppBskyActorGetProfile.Handler) {
     const schema = 'app.bsky.actor.getProfile' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
+
+  getSuggestions(handler: AppBskyActorGetSuggestions.Handler) {
+    const schema = 'app.bsky.actor.getSuggestions' // @ts-ignore
     return this._server.xrpc.method(schema, handler)
   }
 
@@ -319,11 +339,6 @@ export class FeedNS {
     return this._server.xrpc.method(schema, handler)
   }
 
-  getLikedBy(handler: AppBskyFeedGetLikedBy.Handler) {
-    const schema = 'app.bsky.feed.getLikedBy' // @ts-ignore
-    return this._server.xrpc.method(schema, handler)
-  }
-
   getPostThread(handler: AppBskyFeedGetPostThread.Handler) {
     const schema = 'app.bsky.feed.getPostThread' // @ts-ignore
     return this._server.xrpc.method(schema, handler)
@@ -338,6 +353,16 @@ export class FeedNS {
     const schema = 'app.bsky.feed.getTimeline' // @ts-ignore
     return this._server.xrpc.method(schema, handler)
   }
+
+  getVotes(handler: AppBskyFeedGetVotes.Handler) {
+    const schema = 'app.bsky.feed.getVotes' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
+
+  setVote(handler: AppBskyFeedSetVote.Handler) {
+    const schema = 'app.bsky.feed.setVote' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
 }
 
 export class GraphNS {
@@ -347,6 +372,11 @@ export class GraphNS {
     this._server = server
   }
 
+  getAssertions(handler: AppBskyGraphGetAssertions.Handler) {
+    const schema = 'app.bsky.graph.getAssertions' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
+
   getFollowers(handler: AppBskyGraphGetFollowers.Handler) {
     const schema = 'app.bsky.graph.getFollowers' // @ts-ignore
     return this._server.xrpc.method(schema, handler)
@@ -354,6 +384,16 @@ export class GraphNS {
 
   getFollows(handler: AppBskyGraphGetFollows.Handler) {
     const schema = 'app.bsky.graph.getFollows' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
+
+  getMembers(handler: AppBskyGraphGetMembers.Handler) {
+    const schema = 'app.bsky.graph.getMembers' // @ts-ignore
+    return this._server.xrpc.method(schema, handler)
+  }
+
+  getMemberships(handler: AppBskyGraphGetMemberships.Handler) {
+    const schema = 'app.bsky.graph.getMemberships' // @ts-ignore
     return this._server.xrpc.method(schema, handler)
   }
 }

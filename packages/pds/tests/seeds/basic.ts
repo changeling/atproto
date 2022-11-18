@@ -1,28 +1,25 @@
+import { MessageQueue } from '../../src/db/types'
 import { SeedClient } from './client'
+import scenesSeed from './scenes'
+import usersSeed from './users'
 
-export default async (sc: SeedClient) => {
-  await sc.createAccount('alice', users.alice)
-  await sc.createAccount('bob', users.bob)
-  await sc.createAccount('carol', users.carol)
-  await sc.createAccount('dan', users.dan)
+export default async (sc: SeedClient, mq?: MessageQueue) => {
+  await usersSeed(sc)
+
   const alice = sc.dids.alice
   const bob = sc.dids.bob
   const carol = sc.dids.carol
   const dan = sc.dids.dan
 
-  await sc.createProfile(
-    alice,
-    users.alice.displayName,
-    users.alice.description,
-  )
-  await sc.createProfile(bob, users.bob.displayName, users.bob.description)
-  await sc.follow(alice, sc.userRef(bob))
-  await sc.follow(alice, sc.userRef(carol))
-  await sc.follow(alice, sc.userRef(dan))
-  await sc.follow(carol, sc.userRef(alice))
-  await sc.follow(bob, sc.userRef(alice))
-  await sc.follow(bob, sc.userRef(carol))
-  await sc.follow(dan, sc.userRef(bob))
+  await scenesSeed(sc)
+
+  await sc.follow(alice, sc.actorRef(bob))
+  await sc.follow(alice, sc.actorRef(carol))
+  await sc.follow(alice, sc.actorRef(dan))
+  await sc.follow(carol, sc.actorRef(alice))
+  await sc.follow(bob, sc.actorRef(alice))
+  await sc.follow(bob, sc.actorRef(carol))
+  await sc.follow(dan, sc.actorRef(bob))
   await sc.post(alice, posts.alice[0])
   await sc.post(bob, posts.bob[0])
   await sc.post(carol, posts.carol[0])
@@ -37,11 +34,16 @@ export default async (sc: SeedClient) => {
   await sc.post(alice, posts.alice[1])
   await sc.post(bob, posts.bob[1])
   await sc.post(alice, posts.alice[2])
-  await sc.like(bob, sc.posts[alice][1].ref)
-  await sc.like(bob, sc.posts[alice][2].ref)
-  await sc.like(carol, sc.posts[alice][1].ref)
-  await sc.like(carol, sc.posts[alice][2].ref)
-  await sc.like(dan, sc.posts[alice][1].ref)
+  await sc.vote('up', bob, sc.posts[alice][1].ref)
+  await sc.vote('down', bob, sc.posts[alice][2].ref)
+  await sc.vote('down', carol, sc.posts[alice][1].ref)
+  await sc.vote('up', carol, sc.posts[alice][2].ref)
+  await sc.vote('up', dan, sc.posts[alice][1].ref)
+  await sc.vote('up', alice, sc.posts[carol][0].ref)
+  await sc.vote('up', bob, sc.posts[carol][0].ref)
+
+  await mq?.processAll()
+
   await sc.reply(
     bob,
     sc.posts[alice][1].ref,
@@ -63,38 +65,9 @@ export default async (sc: SeedClient) => {
   await sc.repost(carol, sc.posts[dan][1].ref)
   await sc.repost(dan, sc.posts[alice][1].ref)
 
-  return sc
-}
+  await mq?.processAll()
 
-const users = {
-  alice: {
-    email: 'alice@test.com',
-    handle: 'alice.test',
-    password: 'alice-pass',
-    displayName: 'ali',
-    description: 'its me!',
-  },
-  bob: {
-    email: 'bob@test.com',
-    handle: 'bob.test',
-    password: 'bob-pass',
-    displayName: 'bobby',
-    description: 'hi im bob',
-  },
-  carol: {
-    email: 'carol@test.com',
-    handle: 'carol.test',
-    password: 'carol-pass',
-    displayName: undefined,
-    description: undefined,
-  },
-  dan: {
-    email: 'dan@test.com',
-    handle: 'dan.test',
-    password: 'dan-pass',
-    displayName: undefined,
-    description: undefined,
-  },
+  return sc
 }
 
 export const posts = {

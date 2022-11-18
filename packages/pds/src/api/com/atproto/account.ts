@@ -1,15 +1,15 @@
 import { InvalidRequestError } from '@atproto/xrpc-server'
-import { RepoStructure } from '@atproto/repo'
 import { PlcClient } from '@atproto/plc'
+import * as crypto from '@atproto/crypto'
 import * as handleLib from '@atproto/handle'
-import { Server } from '../../../lexicon'
+import { Server, APP_BSKY_SYSTEM } from '../../../lexicon'
 import * as locals from '../../../locals'
 import { countAll } from '../../../db/util'
 import { UserAlreadyExistsError } from '../../../db'
-import SqlBlockstore from '../../../sql-blockstore'
 import { grantRefreshToken } from './util/auth'
-import { AtUri } from '@atproto/uri'
 import * as schema from '../../../lexicon/schemas'
+import * as repoUtil from '../../../util/repo'
+import { cidForData } from '@atproto/common'
 
 export default function (server: Server) {
   server.com.atproto.server.getAccountsConfig((_params, _input, _req, res) => {
@@ -29,21 +29,28 @@ export default function (server: Server) {
   })
 
   server.com.atproto.account.create(async (_params, input, _req, res) => {
-    const { password, inviteCode, recoveryKey } = input.body
+    const { email, password, inviteCode, recoveryKey } = input.body
     const { db, auth, config, keypair, logger } = locals.get(res)
-    const handle = input.body.handle.toLowerCase()
-    const email = input.body.email.toLowerCase()
 
-    // throws if not
+    let handle: string
     try {
-      handleLib.ensureValid(handle, config.availableUserDomains)
+      handle = handleLib.normalizeAndEnsureValid(
+        input.body.handle,
+        config.availableUserDomains,
+      )
     } catch (err) {
       if (err instanceof handleLib.InvalidHandleError) {
         throw new InvalidRequestError(err.message, 'InvalidHandle')
+      } else if (err instanceof handleLib.ReservedHandleError) {
+        throw new InvalidRequestError(err.message, 'HandleNotAvailable')
       }
       throw err
     }
 
+    // In order to perform the significant db updates ahead of
+    // registering the did, we will use a temp invalid did. Once everything
+    // goes well and a fresh did is registered, we'll replace the temp values.
+    const tempDid = crypto.randomStr(16, 'base32')
     const now = new Date().toISOString()
 
     const result = await db.transaction(async (dbTxn) => {
@@ -79,24 +86,24 @@ export default function (server: Server) {
       }
 
       // Pre-register user before going out to PLC to get a real did
-
+      try {
+        await dbTxn.preregisterDid(handle, tempDid)
+      } catch (err) {
+        if (err instanceof UserAlreadyExistsError) {
+          throw new InvalidRequestError(`Handle already taken: ${handle}`)
+        }
+        throw err
+      }
       try {
         await dbTxn.registerUser(email, handle, password)
       } catch (err) {
         if (err instanceof UserAlreadyExistsError) {
-          if ((await dbTxn.getUser(handle)) !== null) {
-            throw new InvalidRequestError(`Handle already taken: ${handle}`)
-          } else if ((await dbTxn.getUserByEmail(email)) !== null) {
-            throw new InvalidRequestError(`Email already taken: ${email}`)
-          } else {
-            throw new InvalidRequestError('Handle or email already taken')
-          }
+          throw new InvalidRequestError(`Email already taken: ${email}`)
         }
         throw err
       }
 
       // Generate a real did with PLC
-
       const plcClient = new PlcClient(config.didPlcUrl)
       let did: string
       try {
@@ -114,11 +121,13 @@ export default function (server: Server) {
         throw err
       }
 
-      // Now that we have a real did, we now replace the tempDid in user and invite_code_use
-      // tables, and setup the repo root. These all _should_ succeed under typical conditions.
-      // It's about as good as we're gonna get transactionally, given that we rely on PLC here to assign the did.
-
-      await dbTxn.registerUserDid(handle, did)
+      // Now that we have a real did, we create the declaration & replace the tempDid
+      // and setup the repo root. This _should_ succeed under typical conditions.
+      const declaration = {
+        $type: schema.ids.AppBskySystemDeclaration,
+        actorType: APP_BSKY_SYSTEM.ActorUser,
+      }
+      await dbTxn.finalizeDid(handle, did, tempDid, declaration)
       if (config.inviteRequired && inviteCode) {
         await dbTxn.db
           .insertInto('invite_code_use')
@@ -130,41 +139,19 @@ export default function (server: Server) {
           .execute()
       }
 
+      const write = await repoUtil.prepareCreate(did, {
+        action: 'create',
+        collection: schema.ids.AppBskySystemDeclaration,
+        rkey: 'self',
+        value: declaration,
+      })
+
       // Setup repo root
       const authStore = locals.getAuthstore(res, did)
-      const blockstore = new SqlBlockstore(dbTxn, did, now)
-      const repo = await RepoStructure.create(blockstore, did, authStore)
+      await repoUtil.createRepo(dbTxn, did, authStore, [write], now)
+      await repoUtil.indexWrites(dbTxn, [write], now)
 
-      const declaration = {
-        $type: 'app.bsky.system.declaration',
-        actorType: 'app.bsky.system.actorUser',
-      }
-      const declarationCid = await blockstore.put(declaration)
-      const uri = new AtUri(
-        `${did}/${schema.ids.AppBskySystemDeclaration}/self`,
-      )
-
-      await repo
-        .stageUpdate({
-          action: 'create',
-          collection: uri.collection,
-          rkey: uri.rkey,
-          cid: declarationCid,
-        })
-        .createCommit(authStore, async (_prev, curr) => {
-          await dbTxn.db
-            .insertInto('repo_root')
-            .values({
-              did: did,
-              root: curr.toString(),
-              indexedAt: now,
-            })
-            .execute()
-          return null
-        })
-
-      await dbTxn.indexRecord(uri, declarationCid, declaration, now)
-
+      const declarationCid = await cidForData(declaration)
       const access = auth.createAccessToken(did)
       const refresh = auth.createRefreshToken(did)
       await grantRefreshToken(dbTxn, refresh.payload)

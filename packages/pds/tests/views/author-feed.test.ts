@@ -21,7 +21,7 @@ describe('pds author feed views', () => {
     close = server.close
     client = AtpApi.service(server.url)
     sc = new SeedClient(client)
-    await basicSeed(sc)
+    await basicSeed(sc, server.db.messageQueue)
     alice = sc.dids.alice
     bob = sc.dids.bob
     carol = sc.dids.carol
@@ -79,11 +79,23 @@ describe('pds author feed views', () => {
     )
 
     aliceForCarol.data.feed.forEach(({ uri, myState }) => {
-      expect(myState?.like).toEqual(sc.likes[carol][uri]?.toString())
+      expect(myState?.upvote).toEqual(sc.votes.up[carol]?.[uri]?.toString())
+      expect(myState?.downvote).toEqual(sc.votes.down[carol]?.[uri]?.toString())
       expect(myState?.repost).toEqual(sc.reposts[carol][uri]?.toString())
     })
 
     expect(forSnapshot(aliceForCarol.data.feed)).toMatchSnapshot()
+  })
+
+  it('fetches scene feeds with trends.', async () => {
+    const sceneForCarol = await client.app.bsky.feed.getAuthorFeed(
+      { author: sc.scenes['scene.test'].handle },
+      {
+        headers: sc.getHeaders(carol),
+      },
+    )
+
+    expect(forSnapshot(sceneForCarol.data.feed)).toMatchSnapshot()
   })
 
   it('paginates', async () => {

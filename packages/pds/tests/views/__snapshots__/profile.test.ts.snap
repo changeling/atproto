@@ -1,13 +1,37 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`pds profile views creates new profile 1`] = `
+Object {
+  "creator": "user(0)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorUser",
+    "cid": "cids(0)",
+  },
+  "did": "user(0)",
+  "displayName": "danny boy",
+  "followersCount": 1,
+  "followsCount": 1,
+  "handle": "dan.test",
+  "membersCount": 0,
+  "myState": Object {},
+  "postsCount": 2,
+}
+`;
+
 exports[`pds profile views fetches other's profile, with a follow 1`] = `
 Object {
+  "creator": "user(0)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorUser",
+    "cid": "cids(0)",
+  },
   "description": "its me!",
   "did": "user(0)",
   "displayName": "ali",
   "followersCount": 2,
   "followsCount": 3,
   "handle": "alice.test",
+  "membersCount": 0,
   "myState": Object {
     "follow": "record(0)",
   },
@@ -17,10 +41,16 @@ Object {
 
 exports[`pds profile views fetches other's profile, without a follow 1`] = `
 Object {
+  "creator": "user(0)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorUser",
+    "cid": "cids(0)",
+  },
   "did": "user(0)",
   "followersCount": 1,
   "followsCount": 1,
   "handle": "dan.test",
+  "membersCount": 0,
   "myState": Object {},
   "postsCount": 2,
 }
@@ -28,38 +58,98 @@ Object {
 
 exports[`pds profile views fetches own profile 1`] = `
 Object {
+  "creator": "user(0)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorUser",
+    "cid": "cids(0)",
+  },
   "description": "its me!",
   "did": "user(0)",
   "displayName": "ali",
   "followersCount": 2,
   "followsCount": 3,
   "handle": "alice.test",
+  "membersCount": 0,
   "myState": Object {},
   "postsCount": 4,
 }
 `;
 
+exports[`pds profile views fetches scene's profile 1`] = `
+Object {
+  "creator": "user(1)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorScene",
+    "cid": "cids(0)",
+  },
+  "description": "best friends eva",
+  "did": "user(0)",
+  "displayName": "besties",
+  "followersCount": 0,
+  "followsCount": 0,
+  "handle": "scene.test",
+  "membersCount": 4,
+  "myState": Object {
+    "member": "record(0)",
+  },
+  "postsCount": 0,
+}
+`;
+
 exports[`pds profile views handles partial updates 1`] = `
 Object {
+  "creator": "user(0)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorUser",
+    "cid": "cids(0)",
+  },
   "description": "blah blah",
   "did": "user(0)",
   "displayName": "ali",
   "followersCount": 2,
   "followsCount": 3,
   "handle": "alice.test",
+  "membersCount": 0,
   "myState": Object {},
   "postsCount": 4,
 }
 `;
 
+exports[`pds profile views handles scene profile updates 1`] = `
+Object {
+  "creator": "user(1)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorScene",
+    "cid": "cids(0)",
+  },
+  "description": "feeling scene",
+  "did": "user(0)",
+  "displayName": "besties",
+  "followersCount": 0,
+  "followsCount": 0,
+  "handle": "scene.test",
+  "membersCount": 4,
+  "myState": Object {
+    "member": "record(0)",
+  },
+  "postsCount": 0,
+}
+`;
+
 exports[`pds profile views updates profile 1`] = `
 Object {
+  "creator": "user(0)",
+  "declaration": Object {
+    "actorType": "app.bsky.system.actorUser",
+    "cid": "cids(0)",
+  },
   "description": "new descript",
   "did": "user(0)",
   "displayName": "ali",
   "followersCount": 2,
   "followsCount": 3,
   "handle": "alice.test",
+  "membersCount": 0,
   "myState": Object {},
   "postsCount": 4,
 }

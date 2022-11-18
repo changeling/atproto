@@ -1,120 +1,98 @@
 import { Kysely } from 'kysely'
 import { AtUri } from '@atproto/uri'
 import * as Repost from '../../lexicon/types/app/bsky/feed/repost'
-import { DbRecordPlugin, Notification } from '../types'
+import { Repost as IndexedRepost } from '../tables/repost'
 import * as schemas from '../schemas'
 import { CID } from 'multiformats/cid'
+import * as messages from '../message-queue/messages'
+import { Message } from '../message-queue/messages'
+import { DatabaseSchema } from '../database-schema'
+import RecordProcessor from '../record-processor'
 
-const type = schemas.ids.AppBskyFeedRepost
-const tableName = 'app_bsky_repost'
+const schemaId = schemas.ids.AppBskyFeedRepost
 
-export interface AppBskyRepost {
-  uri: string
-  cid: string
-  creator: string
-  subject: string
-  subjectCid: string
-  createdAt: string
-  indexedAt: string
-}
-
-export type PartialDB = { [tableName]: AppBskyRepost }
-
-const validator = schemas.records.createRecordValidator(type)
-const matchesSchema = (obj: unknown): obj is Repost.Record => {
-  return validator.isValid(obj)
-}
-const validateSchema = (obj: unknown) => validator.validate(obj)
-
-const translateDbObj = (dbObj: AppBskyRepost): Repost.Record => {
-  return {
-    subject: {
-      uri: dbObj.subject,
-      cid: dbObj.subjectCid,
-    },
-    createdAt: dbObj.createdAt,
-  }
-}
-
-const getFn =
-  (db: Kysely<PartialDB>) =>
-  async (uri: AtUri): Promise<Repost.Record | null> => {
-    const found = await db
-      .selectFrom('app_bsky_repost')
-      .selectAll()
-      .where('uri', '=', uri.toString())
-      .executeTakeFirst()
-    return !found ? null : translateDbObj(found)
-  }
-
-const insertFn =
-  (db: Kysely<PartialDB>) =>
-  async (
-    uri: AtUri,
-    cid: CID,
-    obj: unknown,
-    timestamp?: string,
-  ): Promise<void> => {
-    if (!matchesSchema(obj)) {
-      throw new Error(`Record does not match schema: ${type}`)
-    }
-    await db
-      .insertInto('app_bsky_repost')
-      .values({
-        uri: uri.toString(),
-        cid: cid.toString(),
-        creator: uri.host,
-        subject: obj.subject.uri,
-        subjectCid: obj.subject.cid,
-        createdAt: obj.createdAt,
-        indexedAt: timestamp || new Date().toISOString(),
-      })
-      .execute()
-  }
-
-const deleteFn =
-  (db: Kysely<PartialDB>) =>
-  async (uri: AtUri): Promise<void> => {
-    await db
-      .deleteFrom('app_bsky_repost')
-      .where('uri', '=', uri.toString())
-      .execute()
-  }
-
-const notifsForRecord = (
+const insertFn = async (
+  db: Kysely<DatabaseSchema>,
   uri: AtUri,
   cid: CID,
-  obj: unknown,
-): Notification[] => {
-  if (!matchesSchema(obj)) {
-    throw new Error(`Record does not match schema: ${type}`)
-  }
-  const subjectUri = new AtUri(obj.subject.uri)
-  const notif = {
+  obj: Repost.Record,
+  timestamp?: string,
+): Promise<IndexedRepost | null> => {
+  const inserted = await db
+    .insertInto('repost')
+    .values({
+      uri: uri.toString(),
+      cid: cid.toString(),
+      creator: uri.host,
+      subject: obj.subject.uri,
+      subjectCid: obj.subject.cid,
+      createdAt: obj.createdAt,
+      indexedAt: timestamp || new Date().toISOString(),
+    })
+    .onConflict((oc) => oc.doNothing())
+    .returningAll()
+    .executeTakeFirst()
+  return inserted || null
+}
+
+const findDuplicate = async (
+  db: Kysely<DatabaseSchema>,
+  uri: AtUri,
+  obj: Repost.Record,
+): Promise<AtUri | null> => {
+  const found = await db
+    .selectFrom('repost')
+    .where('creator', '=', uri.host)
+    .where('subject', '=', obj.subject.uri)
+    .selectAll()
+    .executeTakeFirst()
+  return found ? new AtUri(found.uri) : null
+}
+
+const eventsForInsert = (obj: IndexedRepost): Message[] => {
+  const subjectUri = new AtUri(obj.subject)
+  const notif = messages.createNotification({
     userDid: subjectUri.host,
-    author: uri.host,
-    recordUri: uri.toString(),
-    recordCid: cid.toString(),
+    author: obj.creator,
+    recordUri: obj.uri,
+    recordCid: obj.cid,
     reason: 'repost',
     reasonSubject: subjectUri.toString(),
-  }
+  })
   return [notif]
 }
 
-export const makePlugin = (
-  db: Kysely<PartialDB>,
-): DbRecordPlugin<Repost.Record, AppBskyRepost> => {
-  return {
-    collection: type,
-    tableName,
-    validateSchema,
-    matchesSchema,
-    translateDbObj,
-    get: getFn(db),
-    insert: insertFn(db),
-    delete: deleteFn(db),
-    notifsForRecord,
-  }
+const deleteFn = async (
+  db: Kysely<DatabaseSchema>,
+  uri: AtUri,
+): Promise<IndexedRepost | null> => {
+  const deleted = await db
+    .deleteFrom('repost')
+    .where('uri', '=', uri.toString())
+    .returningAll()
+    .executeTakeFirst()
+  return deleted || null
+}
+
+const eventsForDelete = (
+  deleted: IndexedRepost,
+  replacedBy: IndexedRepost | null,
+): Message[] => {
+  if (replacedBy) return []
+  return [messages.deleteNotifications(deleted.uri)]
+}
+
+export type PluginType = RecordProcessor<Repost.Record, IndexedRepost>
+
+export const makePlugin = (db: Kysely<DatabaseSchema>): PluginType => {
+  return new RecordProcessor(db, {
+    schemaId,
+    insertFn,
+    findDuplicate,
+    deleteFn,
+    eventsForInsert,
+    eventsForDelete,
+  })
 }
 
 export default makePlugin
