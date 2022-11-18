@@ -4,6 +4,7 @@ import { SeedClient } from '../seeds/client'
 import basicSeed from '../seeds/basic'
 import * as locals from '../../src/locals'
 import { App } from '../../src'
+import { Notification } from '../../src/lexicon/types/app/bsky/notification/list'
 
 describe('pds notification views', () => {
   let client: AtpServiceClient
@@ -22,7 +23,7 @@ describe('pds notification views', () => {
     app = server.app
     client = AtpApi.service(server.url)
     sc = new SeedClient(client)
-    await basicSeed(sc)
+    await basicSeed(sc, server.db.messageQueue)
     alice = sc.dids.alice
   })
 
@@ -30,13 +31,22 @@ describe('pds notification views', () => {
     await close()
   })
 
+  const sort = (notifs: Notification[]) => {
+    return notifs.sort((a, b) => {
+      if (a.indexedAt === b.indexedAt) {
+        return a.uri > b.uri ? -1 : 1
+      }
+      return a.indexedAt > b.indexedAt ? -a : 1
+    })
+  }
+
   it('fetches notification count without a last-seen', async () => {
     const notifCount = await client.app.bsky.notification.getCount(
       {},
       { headers: sc.getHeaders(alice) },
     )
 
-    expect(notifCount.data.count).toBe(11)
+    expect(notifCount.data.count).toBe(15)
   })
 
   it('fetches notifications without a last-seen', async () => {
@@ -47,8 +57,8 @@ describe('pds notification views', () => {
       },
     )
 
-    const notifs = notifRes.data.notifications
-    expect(notifs.length).toBe(11)
+    const notifs = sort(notifRes.data.notifications)
+    expect(notifs.length).toBe(15)
 
     const readStates = notifs.map((notif) => notif.isRead)
     expect(readStates).toEqual(notifs.map(() => false))
@@ -60,12 +70,16 @@ describe('pds notification views', () => {
   })
 
   it('paginates', async () => {
-    const results = (results) => results.flatMap((res) => res.likedBy)
+    // @TODO there is a small bug where notifications generated with the same
+    // indexedAt time paginate together, even if the page lands between them.
+    // Can see this with assertMember and assertCreator notifications.
+    const results = (results) =>
+      sort(results.flatMap((res) => res.notifications))
     const paginator = async (cursor?: string) => {
       const res = await client.app.bsky.notification.list(
         {
           before: cursor,
-          limit: 4,
+          limit: 6,
         },
         { headers: sc.getHeaders(alice) },
       )
@@ -74,7 +88,7 @@ describe('pds notification views', () => {
 
     const paginatedAll = await paginateAll(paginator)
     paginatedAll.forEach((res) =>
-      expect(res.notifications.length).toBeLessThanOrEqual(4),
+      expect(res.notifications.length).toBeLessThanOrEqual(6),
     )
 
     const full = await client.app.bsky.notification.list(
@@ -84,7 +98,7 @@ describe('pds notification views', () => {
       },
     )
 
-    expect(full.data.notifications.length).toEqual(11)
+    expect(full.data.notifications.length).toEqual(15)
     expect(results(paginatedAll)).toEqual(results([full.data]))
   })
 
@@ -128,8 +142,8 @@ describe('pds notification views', () => {
       },
     )
 
-    const notifs = notifRes.data.notifications
-    expect(notifs.length).toBe(11)
+    const notifs = sort(notifRes.data.notifications)
+    expect(notifs.length).toBe(15)
 
     const readStates = notifs.map((notif) => notif.isRead)
     expect(readStates).toEqual(notifs.map((_, i) => i >= 3))

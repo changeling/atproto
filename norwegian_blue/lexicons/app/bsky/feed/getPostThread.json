@@ -3,8 +3,12 @@
   "id": "app.bsky.feed.getPostThread",
   "type": "query",
   "parameters": {
-    "uri": {"type": "string", "required": true},
-    "depth": {"type": "number"}
+    "type": "object",
+    "required": ["uri"],
+    "properties": {
+      "uri": {"type": "string"},
+      "depth": {"type": "number"}
+    }
   },
   "output": {
     "encoding": "application/json",
@@ -19,7 +23,7 @@
   "defs": {
     "post": {
       "type": "object",
-      "required": ["uri", "cid", "author", "record", "replyCount", "likeCount", "repostCount", "indexedAt"],
+      "required": ["uri", "cid", "author", "record", "replyCount", "repostCount", "upvoteCount", "downvoteCount", "indexedAt"],
       "properties": {
         "uri": {"type": "string"},
         "cid": {"type": "string"},
@@ -38,23 +42,26 @@
           "type": "array",
           "items": {"$ref": "#/defs/post"}
         },
-        "likeCount": {"type": "number"},
         "repostCount": {"type": "number"},
+        "upvoteCount": {"type": "number"},
+        "downvoteCount": {"type": "number"},
         "indexedAt": {"type": "string", "format": "date-time"},
         "myState": {
           "type": "object",
           "properties": {
             "repost": {"type": "string"},
-            "like": {"type": "string"}
+            "upvote": {"type": "string"},
+            "downvote": {"type": "string"}
           }
         }
       }
     },
     "user": {
       "type": "object",
-      "required": ["did", "handle"],
+      "required": ["did", "declaration", "handle"],
       "properties": {
         "did": {"type": "string"},
+        "declaration": {"$ref": "#/defs/declaration"},
         "handle": {"type": "string"},
         "displayName": {
           "type": "string",
@@ -91,6 +98,27 @@
           "not": {"enum": ["record", "external"]}
         }
       }
+    },
+    "declaration": {
+      "type": "object",
+      "required": ["cid", "actorType"],
+      "properties": {
+        "cid": {"type": "string"},
+        "actorType": {
+          "oneOf": [
+            {"$ref": "#/defs/actorKnown"},
+            {"$ref": "#/defs/actorUnknown"}
+          ]
+        }
+      }
+    },
+    "actorKnown": {
+      "type": "string",
+      "enum": ["app.bsky.system.actorUser", "app.bsky.system.actorScene"]
+    },
+    "actorUnknown": {
+      "type": "string",
+      "not": {"enum": ["app.bsky.system.actorUser", "app.bsky.system.actorScene"]}
     }
   }
 }

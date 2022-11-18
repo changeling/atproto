@@ -2,11 +2,14 @@
   "lexicon": 1,
   "id": "app.bsky.feed.getTimeline",
   "type": "query",
-  "description": "A view of the user's home timeline",
+  "description": "A view of the user's home timeline.",
   "parameters": {
-    "algorithm": {"type": "string"},
-    "limit": {"type": "number", "maximum": 100},
-    "before": {"type": "string"}
+    "type": "object",
+    "properties": {
+      "algorithm": {"type": "string"},
+      "limit": {"type": "number", "maximum": 100},
+      "before": {"type": "string"}
+    }
   },
   "output": {
     "encoding": "application/json",
@@ -25,12 +28,13 @@
   "defs": {
     "feedItem": {
       "type": "object",
-      "required": ["uri", "cid", "author", "record", "replyCount", "repostCount", "likeCount", "indexedAt"],
+      "required": ["uri", "cid", "author", "record", "replyCount", "repostCount", "upvoteCount", "downvoteCount", "indexedAt"],
       "properties": {
         "uri": {"type": "string"},
         "cid": {"type": "string"},
-        "author": {"$ref": "#/defs/user"},
-        "repostedBy": {"$ref": "#/defs/user"},
+        "author": {"$ref": "#/defs/actor"},
+        "trendedBy": {"$ref": "#/defs/actor"},
+        "repostedBy": {"$ref": "#/defs/actor"},
         "record": {"type": "object"},
         "embed": {
           "oneOf": [
@@ -41,23 +45,27 @@
         },
         "replyCount": {"type": "number"},
         "repostCount": {"type": "number"},
-        "likeCount": {"type": "number"},
+        "upvoteCount": {"type": "number"},
+        "downvoteCount": {"type": "number"},
         "indexedAt": {"type": "string", "format": "date-time"},
         "myState": {
           "type": "object",
           "properties": {
             "repost": {"type": "string"},
-            "like": {"type": "string"}
+            "upvote": {"type": "string"},
+            "downvote": {"type": "string"}
           }
         }
       }
     },
-    "user": {
+    "actor": {
       "type": "object",
-      "required": ["did", "handle"],
+      "required": ["did", "declaration", "handle"],
       "properties": {
         "did": {"type": "string"},
+        "declaration": {"$ref": "#/defs/declaration"},
         "handle": {"type": "string"},
+        "actorType": {"type": "string"},
         "displayName": {
           "type": "string",
           "maxLength": 64
@@ -69,7 +77,7 @@
       "required": ["type", "author", "record"],
       "properties": {
         "type": {"const": "record"},
-        "author": {"$ref": "#/defs/user"},
+        "author": {"$ref": "#/defs/actor"},
         "record": {"type": "object"}
       }
     },
@@ -93,6 +101,27 @@
           "not": {"enum": ["record", "external"]}
         }
       }
+    },
+    "declaration": {
+      "type": "object",
+      "required": ["cid", "actorType"],
+      "properties": {
+        "cid": {"type": "string"},
+        "actorType": {
+          "oneOf": [
+            {"$ref": "#/defs/actorKnown"},
+            {"$ref": "#/defs/actorUnknown"}
+          ]
+        }
+      }
+    },
+    "actorKnown": {
+      "type": "string",
+      "enum": ["app.bsky.system.actorUser", "app.bsky.system.actorScene"]
+    },
+    "actorUnknown": {
+      "type": "string",
+      "not": {"enum": ["app.bsky.system.actorUser", "app.bsky.system.actorScene"]}
     }
   }
 }

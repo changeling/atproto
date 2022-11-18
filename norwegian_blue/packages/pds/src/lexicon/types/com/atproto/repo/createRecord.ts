@@ -24,7 +24,7 @@ export interface InputSchema {
    */
   validate?: boolean;
   /**
-   * The record to create
+   * The record to create.
    */
   record: {};
 }

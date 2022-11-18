@@ -1,11 +1,11 @@
-import { ServiceClient } from '@atproto/api'
+import { APP_BSKY_GRAPH, ServiceClient } from '@atproto/api'
 import { AtUri } from '@atproto/uri'
 import { CID } from 'multiformats/cid'
 
 // Makes it simple to create data via the XRPC client,
 // and keeps track of all created data in memory for convenience.
 
-class RecordRef {
+export class RecordRef {
   uri: AtUri
   cid: CID
 
@@ -30,7 +30,7 @@ class RecordRef {
   }
 }
 
-class UserRef {
+export class ActorRef {
   did: string
   declarationCid: CID
 
@@ -61,7 +61,7 @@ export class SeedClient {
       handle: string
       email: string
       password: string
-      ref: UserRef
+      ref: ActorRef
     }
   >
   profiles: Record<
@@ -74,9 +74,19 @@ export class SeedClient {
   >
   follows: Record<string, Record<string, RecordRef>>
   posts: Record<string, { text: string; ref: RecordRef }[]>
-  likes: Record<string, Record<string, AtUri>>
+  votes: {
+    up: Record<string, Record<string, AtUri>>
+    down: Record<string, Record<string, AtUri>>
+  }
   replies: Record<string, { text: string; ref: RecordRef }[]>
   reposts: Record<string, RecordRef[]>
+  trends: Record<string, RecordRef[]>
+  scenes: Record<
+    string,
+    { did: string; handle: string; creator: string; ref: ActorRef }
+  >
+  sceneInvites: Record<string, Record<string, RecordRef>>
+  sceneAccepts: Record<string, Record<string, RecordRef>>
   dids: Record<string, string>
 
   constructor(public client: ServiceClient) {
@@ -84,9 +94,13 @@ export class SeedClient {
     this.profiles = {}
     this.follows = {}
     this.posts = {}
-    this.likes = {}
+    this.votes = { up: {}, down: {} }
     this.replies = {}
     this.reposts = {}
+    this.trends = {}
+    this.scenes = {}
+    this.sceneInvites = {}
+    this.sceneAccepts = {}
     this.dids = {}
   }
 
@@ -98,22 +112,35 @@ export class SeedClient {
       password: string
     },
   ) {
-    const { data } = await this.client.com.atproto.account.create(params)
-    this.dids[shortName] = data.did
-    this.accounts[data.did] = {
-      ...data,
+    const { data: account } = await this.client.com.atproto.account.create(
+      params,
+    )
+    const { data: profile } = await this.client.app.bsky.actor.getProfile(
+      {
+        actor: params.handle,
+      },
+      { headers: SeedClient.getHeaders(account.accessJwt) },
+    )
+    this.dids[shortName] = account.did
+    this.accounts[account.did] = {
+      ...account,
       email: params.email,
       password: params.password,
-      ref: new UserRef(data.did, data.declarationCid),
+      ref: new ActorRef(account.did, profile.declaration.cid),
     }
     return this.accounts[shortName]
   }
 
-  async createProfile(by: string, displayName: string, description: string) {
+  async createProfile(
+    by: string,
+    displayName: string,
+    description: string,
+    fromUser?: string,
+  ) {
     const res = await this.client.app.bsky.actor.profile.create(
       { did: by },
       { displayName, description },
-      this.getHeaders(by),
+      this.getHeaders(fromUser || by),
     )
     this.profiles[by] = {
       displayName,
@@ -123,7 +150,7 @@ export class SeedClient {
     return this.profiles[by]
   }
 
-  async follow(from: string, to: UserRef) {
+  async follow(from: string, to: ActorRef) {
     const res = await this.client.app.bsky.graph.follow.create(
       { did: from },
       {
@@ -152,15 +179,15 @@ export class SeedClient {
     return post
   }
 
-  async like(by: string, subject: RecordRef) {
-    const res = await this.client.app.bsky.feed.like.create(
+  async vote(direction: 'up' | 'down', by: string, subject: RecordRef) {
+    const res = await this.client.app.bsky.feed.vote.create(
       { did: by },
-      { subject: subject.raw, createdAt: new Date().toISOString() },
+      { direction, subject: subject.raw, createdAt: new Date().toISOString() },
       this.getHeaders(by),
     )
-    this.likes[by] ??= {}
-    this.likes[by][subject.uriStr] = new AtUri(res.uri)
-    return this.likes[by][subject.uriStr]
+    this.votes[direction][by] ??= {}
+    this.votes[direction][by][subject.uriStr] = new AtUri(res.uri)
+    return this.votes[direction][by][subject.uriStr]
   }
 
   async reply(by: string, root: RecordRef, parent: RecordRef, text: string) {
@@ -197,7 +224,84 @@ export class SeedClient {
     return repost
   }
 
-  userRef(did: string): UserRef {
+  async trend(by: string, scene: string, subject: RecordRef) {
+    const res = await this.client.app.bsky.feed.trend.create(
+      { did: scene },
+      { subject: subject.raw, createdAt: new Date().toISOString() },
+      this.getHeaders(by),
+    )
+    this.trends[by] ??= []
+    const trend = new RecordRef(res.uri, res.cid)
+    this.trends[by].push(trend)
+    return trend
+  }
+
+  async createScene(creator: string, handle: string) {
+    const res = await this.client.app.bsky.actor.createScene(
+      {
+        handle,
+      },
+      {
+        headers: this.getHeaders(creator),
+        encoding: 'application/json',
+      },
+    )
+    const scene = {
+      did: res.data.did,
+      handle: res.data.handle,
+      creator,
+      ref: new ActorRef(res.data.did, res.data.declaration.cid),
+    }
+    this.dids[handle] = res.data.did
+    this.scenes[res.data.handle] = scene
+    return scene
+  }
+
+  async inviteToScene(handle: string, user: ActorRef) {
+    const scene = this.scenes[handle]
+    if (!scene) {
+      throw new Error(`Scene does not exist: ${handle}`)
+    }
+    const res = await this.client.app.bsky.graph.assertion.create(
+      { did: scene.did },
+      {
+        assertion: APP_BSKY_GRAPH.AssertMember,
+        subject: user.raw,
+        createdAt: new Date().toISOString(),
+      },
+      this.getHeaders(scene.creator),
+    )
+    const invite = new RecordRef(res.uri, res.cid)
+    this.sceneInvites[handle] ??= {}
+    this.sceneInvites[handle][user.did] = invite
+    return invite
+  }
+
+  async acceptSceneInvite(
+    user: string,
+    sceneHandle: string,
+    invite: RecordRef,
+  ) {
+    const scene = this.scenes[sceneHandle]
+    if (!scene) {
+      throw new Error(`Scene does not exist: ${sceneHandle}`)
+    }
+    const res = await this.client.app.bsky.graph.confirmation.create(
+      { did: user },
+      {
+        originator: scene.ref.raw,
+        assertion: invite.raw,
+        createdAt: new Date().toISOString(),
+      },
+      this.getHeaders(user),
+    )
+    const accept = new RecordRef(res.uri, res.cid)
+    this.sceneAccepts[sceneHandle] ??= {}
+    this.sceneAccepts[sceneHandle][user] = accept
+    return accept
+  }
+
+  actorRef(did: string): ActorRef {
     return this.accounts[did].ref
   }
 

@@ -4,24 +4,28 @@ exports[`pds author feed views fetches full author feeds for self (sorted, minim
 Array [
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "ali",
       "handle": "alice.test",
     },
     "cid": "cids(0)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
       "createdAt": "1970-01-01T00:00:00.000Z",
       "reply": Object {
         "parent": Object {
-          "cid": "cids(2)",
+          "cid": "cids(3)",
           "uri": "record(2)",
         },
         "root": Object {
-          "cid": "cids(1)",
+          "cid": "cids(2)",
           "uri": "record(1)",
         },
       },
@@ -29,17 +33,22 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(0)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "ali",
       "handle": "alice.test",
     },
-    "cid": "cids(3)",
+    "cid": "cids(4)",
+    "downvoteCount": 1,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 2,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -48,17 +57,22 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 1,
     "uri": "record(3)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "ali",
       "handle": "alice.test",
     },
-    "cid": "cids(1)",
+    "cid": "cids(2)",
+    "downvoteCount": 1,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 3,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -67,17 +81,22 @@ Array [
     },
     "replyCount": 2,
     "repostCount": 1,
+    "upvoteCount": 2,
     "uri": "record(1)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "ali",
       "handle": "alice.test",
     },
-    "cid": "cids(4)",
+    "cid": "cids(5)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -86,6 +105,7 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(4)",
   },
 ]
@@ -95,24 +115,28 @@ exports[`pds author feed views fetches full author feeds for self (sorted, minim
 Array [
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "bobby",
       "handle": "bob.test",
     },
     "cid": "cids(0)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
       "createdAt": "1970-01-01T00:00:00.000Z",
       "reply": Object {
         "parent": Object {
-          "cid": "cids(1)",
+          "cid": "cids(2)",
           "uri": "record(1)",
         },
         "root": Object {
-          "cid": "cids(1)",
+          "cid": "cids(2)",
           "uri": "record(1)",
         },
       },
@@ -120,17 +144,22 @@ Array [
     },
     "replyCount": 1,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(0)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "bobby",
       "handle": "bob.test",
     },
-    "cid": "cids(2)",
+    "cid": "cids(3)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -139,17 +168,22 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(2)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "bobby",
       "handle": "bob.test",
     },
-    "cid": "cids(3)",
+    "cid": "cids(4)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -158,6 +192,7 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(3)",
   },
 ]
@@ -167,12 +202,16 @@ exports[`pds author feed views fetches full author feeds for self (sorted, minim
 Array [
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "handle": "dan.test",
     },
     "cid": "cids(0)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {
       "repost": "record(1)",
     },
@@ -194,30 +233,39 @@ Array [
     "replyCount": 0,
     "repostCount": 1,
     "repostedBy": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(1)",
       "handle": "carol.test",
     },
+    "upvoteCount": 0,
     "uri": "record(0)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(1)",
       "handle": "carol.test",
     },
-    "cid": "cids(1)",
+    "cid": "cids(2)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
       "createdAt": "1970-01-01T00:00:00.000Z",
       "reply": Object {
         "parent": Object {
-          "cid": "cids(2)",
+          "cid": "cids(3)",
           "uri": "record(3)",
         },
         "root": Object {
-          "cid": "cids(2)",
+          "cid": "cids(3)",
           "uri": "record(3)",
         },
       },
@@ -225,16 +273,21 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(2)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(1)",
       "handle": "carol.test",
     },
-    "cid": "cids(3)",
+    "cid": "cids(4)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -243,6 +296,7 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 2,
     "uri": "record(4)",
   },
 ]
@@ -252,16 +306,20 @@ exports[`pds author feed views fetches full author feeds for self (sorted, minim
 Array [
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "ali",
       "handle": "alice.test",
     },
     "cid": "cids(0)",
+    "downvoteCount": 1,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 3,
     "myState": Object {
-      "like": "record(2)",
       "repost": "record(1)",
+      "upvote": "record(2)",
     },
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -271,19 +329,28 @@ Array [
     "replyCount": 2,
     "repostCount": 1,
     "repostedBy": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(1)",
       "handle": "dan.test",
     },
+    "upvoteCount": 2,
     "uri": "record(0)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(1)",
       "handle": "dan.test",
     },
-    "cid": "cids(1)",
+    "cid": "cids(2)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -302,16 +369,21 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 1,
+    "upvoteCount": 0,
     "uri": "record(3)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(1)",
       "handle": "dan.test",
     },
-    "cid": "cids(2)",
+    "cid": "cids(3)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -320,74 +392,61 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(4)",
   },
 ]
 `;
 
-exports[`pds author feed views reflects fetching user's state in the feed. 1`] = `
+exports[`pds author feed views fetches scene feeds with trends. 1`] = `
 Array [
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
-      "displayName": "ali",
-      "handle": "alice.test",
+      "handle": "carol.test",
     },
     "cid": "cids(0)",
+    "downvoteCount": 0,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "reply": Object {
-        "parent": Object {
-          "cid": "cids(2)",
-          "uri": "record(2)",
-        },
-        "root": Object {
-          "cid": "cids(1)",
-          "uri": "record(1)",
-        },
-      },
-      "text": "thanks bob",
+      "text": "hi im carol",
     },
     "replyCount": 0,
     "repostCount": 0,
+    "trendedBy": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorScene",
+        "cid": "cids(2)",
+      },
+      "did": "user(1)",
+      "displayName": "besties",
+      "handle": "scene.test",
+    },
+    "upvoteCount": 2,
     "uri": "record(0)",
   },
   Object {
     "author": Object {
-      "did": "user(0)",
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
+      "did": "user(2)",
       "displayName": "ali",
       "handle": "alice.test",
     },
     "cid": "cids(3)",
+    "downvoteCount": 1,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 2,
     "myState": Object {
-      "like": "record(4)",
-    },
-    "record": Object {
-      "$type": "app.bsky.feed.post",
-      "createdAt": "1970-01-01T00:00:00.000Z",
-      "text": "yoohoo",
-    },
-    "replyCount": 0,
-    "repostCount": 0,
-    "uri": "record(3)",
-  },
-  Object {
-    "author": Object {
-      "did": "user(0)",
-      "displayName": "ali",
-      "handle": "alice.test",
-    },
-    "cid": "cids(1)",
-    "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 3,
-    "myState": Object {
-      "like": "record(5)",
+      "downvote": "record(2)",
     },
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -396,17 +455,122 @@ Array [
     },
     "replyCount": 2,
     "repostCount": 1,
+    "trendedBy": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorScene",
+        "cid": "cids(2)",
+      },
+      "did": "user(1)",
+      "displayName": "besties",
+      "handle": "scene.test",
+    },
+    "upvoteCount": 2,
     "uri": "record(1)",
+  },
+]
+`;
+
+exports[`pds author feed views reflects fetching user's state in the feed. 1`] = `
+Array [
+  Object {
+    "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
+      "did": "user(0)",
+      "displayName": "ali",
+      "handle": "alice.test",
+    },
+    "cid": "cids(0)",
+    "downvoteCount": 0,
+    "indexedAt": "1970-01-01T00:00:00.000Z",
+    "myState": Object {},
+    "record": Object {
+      "$type": "app.bsky.feed.post",
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "reply": Object {
+        "parent": Object {
+          "cid": "cids(3)",
+          "uri": "record(2)",
+        },
+        "root": Object {
+          "cid": "cids(2)",
+          "uri": "record(1)",
+        },
+      },
+      "text": "thanks bob",
+    },
+    "replyCount": 0,
+    "repostCount": 0,
+    "upvoteCount": 0,
+    "uri": "record(0)",
   },
   Object {
     "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
       "did": "user(0)",
       "displayName": "ali",
       "handle": "alice.test",
     },
     "cid": "cids(4)",
+    "downvoteCount": 1,
     "indexedAt": "1970-01-01T00:00:00.000Z",
-    "likeCount": 0,
+    "myState": Object {
+      "upvote": "record(4)",
+    },
+    "record": Object {
+      "$type": "app.bsky.feed.post",
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "text": "yoohoo",
+    },
+    "replyCount": 0,
+    "repostCount": 0,
+    "upvoteCount": 1,
+    "uri": "record(3)",
+  },
+  Object {
+    "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
+      "did": "user(0)",
+      "displayName": "ali",
+      "handle": "alice.test",
+    },
+    "cid": "cids(2)",
+    "downvoteCount": 1,
+    "indexedAt": "1970-01-01T00:00:00.000Z",
+    "myState": Object {
+      "downvote": "record(5)",
+    },
+    "record": Object {
+      "$type": "app.bsky.feed.post",
+      "createdAt": "1970-01-01T00:00:00.000Z",
+      "text": "again",
+    },
+    "replyCount": 2,
+    "repostCount": 1,
+    "upvoteCount": 2,
+    "uri": "record(1)",
+  },
+  Object {
+    "author": Object {
+      "declaration": Object {
+        "actorType": "app.bsky.system.actorUser",
+        "cid": "cids(1)",
+      },
+      "did": "user(0)",
+      "displayName": "ali",
+      "handle": "alice.test",
+    },
+    "cid": "cids(5)",
+    "downvoteCount": 0,
+    "indexedAt": "1970-01-01T00:00:00.000Z",
     "myState": Object {},
     "record": Object {
       "$type": "app.bsky.feed.post",
@@ -415,6 +579,7 @@ Array [
     },
     "replyCount": 0,
     "repostCount": 0,
+    "upvoteCount": 0,
     "uri": "record(6)",
   },
 ]

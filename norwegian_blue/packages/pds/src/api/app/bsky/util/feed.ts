@@ -1,4 +1,5 @@
 import * as common from '@atproto/common'
+import { getDeclaration } from '.'
 import * as GetAuthorFeed from '../../../../lexicon/types/app/bsky/feed/getAuthorFeed'
 import * as GetTimeline from '../../../../lexicon/types/app/bsky/feed/getTimeline'
 
@@ -7,28 +8,34 @@ import * as GetTimeline from '../../../../lexicon/types/app/bsky/feed/getTimelin
 export const rowToFeedItem = (row: FeedRow): FeedItem => ({
   uri: row.postUri,
   cid: row.postCid,
-  author: {
-    did: row.authorDid,
-    handle: row.authorHandle,
-    displayName: row.authorDisplayName ?? undefined,
-  },
-  repostedBy:
-    row.type === 'repost'
-      ? {
-          did: row.originatorDid,
-          handle: row.originatorHandle,
-          displayName: row.originatorDisplayName ?? undefined,
-        }
-      : undefined,
+  author: rowToAuthor(row),
+  trendedBy: row.type === 'trend' ? rowToOriginator(row) : undefined,
+  repostedBy: row.type === 'repost' ? rowToOriginator(row) : undefined,
   record: common.ipldBytesToRecord(row.recordBytes),
   replyCount: row.replyCount,
   repostCount: row.repostCount,
-  likeCount: row.likeCount,
+  upvoteCount: row.upvoteCount,
+  downvoteCount: row.downvoteCount,
   indexedAt: row.indexedAt,
   myState: {
     repost: row.requesterRepost ?? undefined,
-    like: row.requesterLike ?? undefined,
+    upvote: row.requesterUpvote ?? undefined,
+    downvote: row.requesterDownvote ?? undefined,
   },
+})
+
+const rowToAuthor = (row: FeedRow) => ({
+  did: row.authorDid,
+  declaration: getDeclaration('author', row),
+  handle: row.authorHandle,
+  displayName: row.authorDisplayName ?? undefined,
+})
+
+const rowToOriginator = (row: FeedRow) => ({
+  did: row.originatorDid,
+  declaration: getDeclaration('originator', row),
+  handle: row.originatorHandle,
+  displayName: row.originatorDisplayName ?? undefined,
 })
 
 export enum FeedAlgorithm {
@@ -38,22 +45,30 @@ export enum FeedAlgorithm {
 
 type FeedItem = GetAuthorFeed.FeedItem & GetTimeline.FeedItem
 
+export type FeedItemType = 'post' | 'repost' | 'trend'
+
 type FeedRow = {
-  type: 'post' | 'repost'
+  type: FeedItemType
   postUri: string
   postCid: string
   cursor: string
   recordBytes: Uint8Array
   indexedAt: string
   authorDid: string
+  authorDeclarationCid: string
+  authorActorType: string
   authorHandle: string
   authorDisplayName: string | null
   originatorDid: string
+  originatorDeclarationCid: string
+  originatorActorType: string
   originatorHandle: string
   originatorDisplayName: string | null
-  likeCount: number
+  upvoteCount: number
+  downvoteCount: number
   repostCount: number
   replyCount: number
   requesterRepost: string | null
-  requesterLike: string | null
+  requesterUpvote: string | null
+  requesterDownvote: string | null
 }

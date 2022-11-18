@@ -3,24 +3,15 @@ import { Kysely, SqliteDialect, PostgresDialect, Migrator } from 'kysely'
 import SqliteDB from 'better-sqlite3'
 import { Pool as PgPool, types as pgTypes } from 'pg'
 import { ValidationResult, ValidationResultCode } from '@atproto/lexicon'
-import { DbRecordPlugin, NotificationsPlugin } from './types'
-import * as Declaration from '../lexicon/types/app/bsky/system/declaration'
-import * as Invite from '../lexicon/types/app/bsky/graph/invite'
-import * as InviteAccept from '../lexicon/types/app/bsky/graph/inviteAccept'
-import * as Follow from '../lexicon/types/app/bsky/graph/follow'
-import * as Like from '../lexicon/types/app/bsky/feed/like'
-import * as Post from '../lexicon/types/app/bsky/feed/post'
-import * as Profile from '../lexicon/types/app/bsky/actor/profile'
-import * as Repost from '../lexicon/types/app/bsky/feed/repost'
-import declarationPlugin, { AppBskyDeclaration } from './records/declaration'
-import postPlugin, { AppBskyPost } from './records/post'
-import likePlugin, { AppBskyLike } from './records/like'
-import repostPlugin, { AppBskyRepost } from './records/repost'
-import followPlugin, { AppBskyFollow } from './records/follow'
-import invitePlugin, { AppBskyInvite } from './records/invite'
-import inviteAcceptPlugin, { AppBskyInviteAccept } from './records/inviteAccept'
-import profilePlugin, { AppBskyProfile } from './records/profile'
-import notificationPlugin from './tables/user-notification'
+import * as Declaration from './records/declaration'
+import * as Post from './records/post'
+import * as Vote from './records/vote'
+import * as Repost from './records/repost'
+import * as Trend from './records/trend'
+import * as Follow from './records/follow'
+import * as Assertion from './records/assertion'
+import * as Confirmation from './records/confirmation'
+import * as Profile from './records/profile'
 import { AtUri } from '@atproto/uri'
 import * as common from '@atproto/common'
 import { CID } from 'multiformats/cid'
@@ -31,38 +22,42 @@ import { User } from './tables/user'
 import { dummyDialect } from './util'
 import * as migrations from './migrations'
 import { CtxMigrationProvider } from './migrations/provider'
-import { UserDid } from './tables/user-did'
+import { DidHandle } from './tables/did-handle'
+import { Record as DeclarationRecord } from '../lexicon/types/app/bsky/system/declaration'
+import { APP_BSKY_GRAPH } from '../lexicon'
+import { MessageQueue } from './types'
 
 export class Database {
   migrator: Migrator
   records: {
-    declaration: DbRecordPlugin<Declaration.Record, AppBskyDeclaration>
-    post: DbRecordPlugin<Post.Record, AppBskyPost>
-    like: DbRecordPlugin<Like.Record, AppBskyLike>
-    repost: DbRecordPlugin<Repost.Record, AppBskyRepost>
-    follow: DbRecordPlugin<Follow.Record, AppBskyFollow>
-    profile: DbRecordPlugin<Profile.Record, AppBskyProfile>
-    invite: DbRecordPlugin<Invite.Record, AppBskyInvite>
-    inviteAccept: DbRecordPlugin<InviteAccept.Record, AppBskyInviteAccept>
+    declaration: Declaration.PluginType
+    post: Post.PluginType
+    vote: Vote.PluginType
+    repost: Repost.PluginType
+    trend: Trend.PluginType
+    follow: Follow.PluginType
+    profile: Profile.PluginType
+    assertion: Assertion.PluginType
+    confirmation: Confirmation.PluginType
   }
-  notifications: NotificationsPlugin
 
   constructor(
     public db: Kysely<DatabaseSchema>,
     public dialect: Dialect,
     public schema?: string,
+    public messageQueue?: MessageQueue,
   ) {
     this.records = {
-      declaration: declarationPlugin(db),
-      post: postPlugin(db),
-      like: likePlugin(db),
-      repost: repostPlugin(db),
-      follow: followPlugin(db),
-      invite: invitePlugin(db),
-      inviteAccept: inviteAcceptPlugin(db),
-      profile: profilePlugin(db),
+      declaration: Declaration.makePlugin(db),
+      post: Post.makePlugin(db),
+      vote: Vote.makePlugin(db),
+      repost: Repost.makePlugin(db),
+      trend: Trend.makePlugin(db),
+      follow: Follow.makePlugin(db),
+      assertion: Assertion.makePlugin(db),
+      confirmation: Confirmation.makePlugin(db),
+      profile: Profile.makePlugin(db),
     }
-    this.notifications = notificationPlugin(db)
     this.migrator = new Migrator({
       db,
       migrationTableSchema: schema,
@@ -112,7 +107,12 @@ export class Database {
 
   async transaction<T>(fn: (db: Database) => Promise<T>): Promise<T> {
     return await this.db.transaction().execute((txn) => {
-      const dbTxn = new Database(txn, this.dialect, this.schema)
+      const dbTxn = new Database(
+        txn,
+        this.dialect,
+        this.schema,
+        this.messageQueue,
+      )
       return fn(dbTxn)
     })
   }
@@ -126,6 +126,7 @@ export class Database {
   }
 
   async close(): Promise<void> {
+    this.messageQueue?.destroy()
     await this.db.destroy()
   }
 
@@ -141,6 +142,10 @@ export class Database {
       throw new Error('An unknown failure occurred while migrating')
     }
     return results
+  }
+
+  setMessageQueue(mq: MessageQueue) {
+    this.messageQueue = mq
   }
 
   async getRepoRoot(did: string, forUpdate?: boolean): Promise<CID | null> {
@@ -187,33 +192,37 @@ export class Database {
     }
   }
 
-  async getUser(handleOrDid: string): Promise<(User & UserDid) | null> {
+  async getUser(handleOrDid: string): Promise<(User & DidHandle) | null> {
     let query = this.db
       .selectFrom('user')
-      .innerJoin('user_did', 'user_did.handle', 'user.handle')
+      .innerJoin('did_handle', 'did_handle.handle', 'user.handle')
       .selectAll()
     if (handleOrDid.startsWith('did:')) {
       query = query.where('did', '=', handleOrDid)
     } else {
-      query = query.where('user_did.handle', '=', handleOrDid.toLowerCase())
+      query = query.where('did_handle.handle', '=', handleOrDid.toLowerCase())
     }
     const found = await query.executeTakeFirst()
     return found || null
   }
 
-  async getUserByEmail(email: string): Promise<(User & UserDid) | null> {
+  async getUserByEmail(email: string): Promise<(User & DidHandle) | null> {
     const found = await this.db
       .selectFrom('user')
-      .innerJoin('user_did', 'user_did.handle', 'user.handle')
+      .innerJoin('did_handle', 'did_handle.handle', 'user.handle')
       .selectAll()
       .where('email', '=', email.toLowerCase())
       .executeTakeFirst()
     return found || null
   }
 
-  async getUserDid(handleOrDid: string): Promise<string | null> {
+  async getDidForActor(handleOrDid: string): Promise<string | null> {
     if (handleOrDid.startsWith('did:')) return handleOrDid
-    const found = await this.getUser(handleOrDid)
+    const found = await this.db
+      .selectFrom('did_handle')
+      .where('handle', '=', handleOrDid)
+      .select('did')
+      .executeTakeFirst()
     return found ? found.did : null
   }
 
@@ -223,7 +232,7 @@ export class Database {
     const inserted = await this.db
       .insertInto('user')
       .values({
-        email: email,
+        email: email.toLowerCase(),
         handle: handle,
         password: await scrypt.hash(password),
         createdAt: new Date().toISOString(),
@@ -238,14 +247,49 @@ export class Database {
     log.info({ handle, email }, 'registered user')
   }
 
-  async registerUserDid(handle: string, did: string) {
+  async preregisterDid(handle: string, tempDid: string) {
     this.assertTransaction()
-    log.debug({ handle, did }, 'registering user did')
-    await this.db
-      .insertInto('user_did')
-      .values({ handle, did })
+    const inserted = await this.db
+      .insertInto('did_handle')
+      .values({
+        handle,
+        did: tempDid,
+        actorType: 'temp',
+        declarationCid: 'temp',
+      })
+      .onConflict((oc) => oc.doNothing())
+      .returning('handle')
       .executeTakeFirst()
-    log.info({ handle, did }, 'post-registered user')
+    if (!inserted) {
+      throw new UserAlreadyExistsError()
+    }
+    log.info({ handle, tempDid }, 'pre-registered did')
+  }
+
+  async finalizeDid(
+    handle: string,
+    did: string,
+    tempDid: string,
+    declaration: DeclarationRecord,
+  ) {
+    this.assertTransaction()
+    log.debug({ handle, did }, 'registering did-handle')
+    const declarationCid = await common.cidForData(declaration)
+    const updated = await this.db
+      .updateTable('did_handle')
+      .set({
+        did,
+        actorType: declaration.actorType,
+        declarationCid: declarationCid.toString(),
+      })
+      .where('handle', '=', handle)
+      .where('did', '=', tempDid)
+      .returningAll()
+      .executeTakeFirst()
+    if (!updated) {
+      throw new Error('DID could not be finalized')
+    }
+    log.info({ handle, did }, 'post-registered did-handle')
   }
 
   async updateUserPassword(handle: string, password: string) {
@@ -265,6 +309,33 @@ export class Database {
       .executeTakeFirst()
     if (!found) return false
     return scrypt.verify(password, found.password)
+  }
+
+  async isUserControlledRepo(
+    repoDid: string,
+    userDid: string | null,
+  ): Promise<boolean> {
+    if (!userDid) return false
+    if (repoDid === userDid) return true
+    const found = await this.db
+      .selectFrom('did_handle')
+      .leftJoin('scene', 'scene.handle', 'did_handle.handle')
+      .where('did_handle.did', '=', repoDid)
+      .where('scene.owner', '=', userDid)
+      .select('scene.owner')
+      .executeTakeFirst()
+    return !!found
+  }
+
+  async getScenesForUser(userDid: string): Promise<string[]> {
+    const res = await this.db
+      .selectFrom('assertion')
+      .where('assertion.subjectDid', '=', userDid)
+      .where('assertion.assertion', '=', APP_BSKY_GRAPH.AssertMember)
+      .where('assertion.confirmUri', 'is not', null)
+      .select('assertion.creator as scene')
+      .execute()
+    return res.map((row) => row.scene)
   }
 
   validateRecord(collection: string, obj: unknown): ValidationResult {
@@ -302,14 +373,15 @@ export class Database {
       throw new Error('Expected indexed URI to contain a record key')
     }
     await this.db.insertInto('record').values(record).execute()
+
     const table = this.findTableForCollection(uri.collection)
-    await table.insert(uri, cid, obj, timestamp)
-    const notifs = table.notifsForRecord(uri, cid, obj)
-    await this.notifications.process(notifs)
+    const events = await table.insertRecord(uri, cid, obj, timestamp)
+    this.messageQueue && (await this.messageQueue.send(this, events))
+
     log.info({ uri }, 'indexed record')
   }
 
-  async deleteRecord(uri: AtUri) {
+  async deleteRecord(uri: AtUri, cascading = false) {
     this.assertTransaction()
     log.debug({ uri }, 'deleting indexed record')
     const table = this.findTableForCollection(uri.collection)
@@ -317,11 +389,12 @@ export class Database {
       .deleteFrom('record')
       .where('uri', '=', uri.toString())
       .execute()
-    await Promise.all([
-      table.delete(uri),
+
+    const [events, _] = await Promise.all([
+      table.deleteRecord(uri, cascading),
       deleteQuery,
-      this.notifications.deleteForRecord(uri),
     ])
+    this.messageQueue && (await this.messageQueue.send(this, events))
 
     log.info({ uri }, 'deleted indexed record')
   }

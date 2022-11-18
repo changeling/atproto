@@ -6,6 +6,7 @@ import * as GetPostThread from '../../../../lexicon/types/app/bsky/feed/getPostT
 import * as locals from '../../../../locals'
 import { DatabaseSchema } from '../../../../db/database-schema'
 import { countAll } from '../../../../db/util'
+import { getDeclaration } from '../util'
 
 export default function (server: Server) {
   server.app.bsky.feed.getPostThread(
@@ -31,10 +32,7 @@ export default function (server: Server) {
         thread.replies = await getReplies(db.db, thread, depth - 1, requester)
       }
       if (queryRes.parent !== null) {
-        const parentRes = await postInfoBuilder(db.db, requester)
-          .where('post.uri', '=', queryRes.parent)
-          .executeTakeFirstOrThrow()
-        thread.parent = rowToPost(parentRes)
+        thread.parent = await getAncestors(db.db, queryRes.parent, requester)
       }
 
       return {
@@ -43,6 +41,21 @@ export default function (server: Server) {
       }
     },
   )
+}
+
+const getAncestors = async (
+  db: Kysely<DatabaseSchema>,
+  parentUri: string,
+  requester: string,
+): Promise<GetPostThread.Post> => {
+  const parentRes = await postInfoBuilder(db, requester)
+    .where('post.uri', '=', parentUri)
+    .executeTakeFirstOrThrow()
+  const parentObj = rowToPost(parentRes)
+  if (parentRes.parent !== null) {
+    parentObj.parent = await getAncestors(db, parentRes.parent, requester)
+  }
+  return parentObj
 }
 
 const getReplies = async (
@@ -72,11 +85,11 @@ const getReplies = async (
 const postInfoBuilder = (db: Kysely<DatabaseSchema>, requester: string) => {
   const { ref } = db.dynamic
   return db
-    .selectFrom('app_bsky_post as post')
+    .selectFrom('post')
     .innerJoin('ipld_block', 'ipld_block.cid', 'post.cid')
-    .innerJoin('user_did as author', 'author.did', 'post.creator')
+    .innerJoin('did_handle as author', 'author.did', 'post.creator')
     .leftJoin(
-      'app_bsky_profile as author_profile',
+      'profile as author_profile',
       'author.did',
       'author_profile.creator',
     )
@@ -85,37 +98,54 @@ const postInfoBuilder = (db: Kysely<DatabaseSchema>, requester: string) => {
       'post.cid as cid',
       'post.replyParent as parent',
       'author.did as authorDid',
+      'author.declarationCid as authorDeclarationCid',
+      'author.actorType as authorActorType',
       'author.handle as authorHandle',
       'author_profile.displayName as authorDisplayName',
       'ipld_block.content as recordBytes',
       'ipld_block.indexedAt as indexedAt',
       db
-        .selectFrom('app_bsky_like')
-        .select(countAll.as('count'))
+        .selectFrom('vote')
         .whereRef('subject', '=', ref('post.uri'))
-        .as('likeCount'),
+        .where('direction', '=', 'up')
+        .select(countAll.as('count'))
+        .as('upvoteCount'),
       db
-        .selectFrom('app_bsky_repost')
+        .selectFrom('vote')
+        .whereRef('subject', '=', ref('post.uri'))
+        .where('direction', '=', 'down')
+        .select(countAll.as('count'))
+        .as('downvoteCount'),
+      db
+        .selectFrom('repost')
         .select(countAll.as('count'))
         .whereRef('subject', '=', ref('post.uri'))
         .as('repostCount'),
       db
-        .selectFrom('app_bsky_post')
+        .selectFrom('post as reply')
         .select(countAll.as('count'))
         .whereRef('replyParent', '=', ref('post.uri'))
         .as('replyCount'),
       db
-        .selectFrom('app_bsky_repost')
+        .selectFrom('repost')
         .select('uri')
         .where('creator', '=', requester)
         .whereRef('subject', '=', ref('post.uri'))
         .as('requesterRepost'),
       db
-        .selectFrom('app_bsky_like')
-        .select('uri')
+        .selectFrom('vote')
         .where('creator', '=', requester)
         .whereRef('subject', '=', ref('post.uri'))
-        .as('requesterLike'),
+        .where('direction', '=', 'up')
+        .select('uri')
+        .as('requesterUpvote'),
+      db
+        .selectFrom('vote')
+        .where('creator', '=', requester)
+        .whereRef('subject', '=', ref('post.uri'))
+        .where('direction', '=', 'down')
+        .select('uri')
+        .as('requesterDownvote'),
     ])
 }
 
@@ -130,18 +160,21 @@ const rowToPost = (
     cid: row.cid,
     author: {
       did: row.authorDid,
+      declaration: getDeclaration('author', row),
       handle: row.authorHandle,
       displayName: row.authorDisplayName || undefined,
     },
     record: common.ipldBytesToRecord(row.recordBytes),
     parent: parent ? { ...parent } : undefined,
     replyCount: row.replyCount || 0,
-    likeCount: row.likeCount || 0,
+    upvoteCount: row.upvoteCount || 0,
+    downvoteCount: row.downvoteCount || 0,
     repostCount: row.repostCount || 0,
     indexedAt: row.indexedAt,
     myState: {
       repost: row.requesterRepost || undefined,
-      like: row.requesterLike || undefined,
+      upvote: row.requesterUpvote || undefined,
+      downvote: row.requesterDownvote || undefined,
     },
   }
 }

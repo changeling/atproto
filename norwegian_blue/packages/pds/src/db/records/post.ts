@@ -2,192 +2,140 @@ import { Kysely } from 'kysely'
 import { AtUri } from '@atproto/uri'
 import { CID } from 'multiformats/cid'
 import * as Post from '../../lexicon/types/app/bsky/feed/post'
-import { DbRecordPlugin, Notification } from '../types'
+import * as PostTables from '../tables/post'
 import * as schemas from '../schemas'
+import * as messages from '../message-queue/messages'
+import { Message } from '../message-queue/messages'
+import DatabaseSchema from '../database-schema'
+import RecordProcessor from '../record-processor'
 
-const type = schemas.ids.AppBskyFeedPost
-const tableName = 'app_bsky_post'
-
-export interface AppBskyPost {
-  uri: string
-  cid: string
-  creator: string
-  text: string
-  replyRoot: string | null
-  replyRootCid: string | null
-  replyParent: string | null
-  replyParentCid: string | null
-  createdAt: string
-  indexedAt: string
+type IndexedPost = {
+  post: PostTables.Post
+  entities: PostTables.PostEntity[]
 }
 
-const supportingTableName = 'app_bsky_post_entity'
-export interface AppBskyPostEntity {
-  postUri: string
-  startIndex: number
-  endIndex: number
-  type: string
-  value: string
-}
+const schemaId = schemas.ids.AppBskyFeedPost
 
-export type PartialDB = {
-  [tableName]: AppBskyPost
-  [supportingTableName]: AppBskyPostEntity
-}
-
-const validator = schemas.records.createRecordValidator(type)
-const matchesSchema = (obj: unknown): obj is Post.Record => {
-  return validator.isValid(obj)
-}
-const validateSchema = (obj: unknown) => validator.validate(obj)
-
-const translateDbObj = (dbObj: AppBskyPost): Post.Record => {
-  const record: Post.Record = {
-    text: dbObj.text,
-    createdAt: dbObj.createdAt,
-  }
-
-  if (dbObj.replyRoot && dbObj.replyParent && dbObj.replyParentCid) {
-    record.reply = {
-      root: {
-        uri: dbObj.replyRoot,
-        cid: dbObj.replyParentCid,
-      },
-      parent: {
-        uri: dbObj.replyParent,
-        cid: dbObj.replyParentCid,
-      },
-    }
-  }
-  return record
-}
-
-const getFn =
-  (db: Kysely<PartialDB>) =>
-  async (uri: AtUri): Promise<Post.Record | null> => {
-    const postQuery = db
-      .selectFrom('app_bsky_post')
-      .selectAll()
-      .where('uri', '=', uri.toString())
-      .executeTakeFirst()
-    const entitiesQuery = db
-      .selectFrom('app_bsky_post_entity')
-      .selectAll()
-      .where('postUri', '=', uri.toString())
-      .execute()
-    const [post, entities] = await Promise.all([postQuery, entitiesQuery])
-    if (!post) return null
-    const record = translateDbObj(post)
-    record.entities = entities.map((row) => ({
-      index: { start: row.startIndex, end: row.endIndex },
-      type: row.type,
-      value: row.value,
-    }))
-    return record
-  }
-
-const insertFn =
-  (db: Kysely<PartialDB>) =>
-  async (
-    uri: AtUri,
-    cid: CID,
-    obj: unknown,
-    timestamp?: string,
-  ): Promise<void> => {
-    if (!matchesSchema(obj)) {
-      throw new Error(`Record does not match schema: ${type}`)
-    }
-    const entities = (obj.entities || []).map((entity) => ({
-      postUri: uri.toString(),
-      startIndex: entity.index.start,
-      endIndex: entity.index.end,
-      type: entity.type,
-      value: entity.value,
-    }))
-    const post = {
-      uri: uri.toString(),
-      cid: cid.toString(),
-      creator: uri.host,
-      text: obj.text,
-      createdAt: obj.createdAt,
-      replyRoot: obj.reply?.root?.uri || null,
-      replyRootCid: obj.reply?.root?.cid || null,
-      replyParent: obj.reply?.parent?.uri || null,
-      replyParentCid: obj.reply?.parent?.cid || null,
-      indexedAt: timestamp || new Date().toISOString(),
-    }
-    const promises = [db.insertInto('app_bsky_post').values(post).execute()]
-    if (entities.length > 0) {
-      promises.push(
-        db.insertInto('app_bsky_post_entity').values(entities).execute(),
-      )
-    }
-    await Promise.all(promises)
-  }
-
-const deleteFn =
-  (db: Kysely<PartialDB>) =>
-  async (uri: AtUri): Promise<void> => {
-    await Promise.all([
-      db
-        .deleteFrom('app_bsky_post')
-        .where('uri', '=', uri.toString())
-        .execute(),
-      db
-        .deleteFrom('app_bsky_post_entity')
-        .where('postUri', '=', uri.toString())
-        .execute(),
-    ])
-  }
-
-const notifsForRecord = (
+const insertFn = async (
+  db: Kysely<DatabaseSchema>,
   uri: AtUri,
   cid: CID,
-  obj: unknown,
-): Notification[] => {
-  if (!matchesSchema(obj)) {
-    throw new Error(`Record does not match schema: ${type}`)
+  obj: Post.Record,
+  timestamp?: string,
+): Promise<IndexedPost | null> => {
+  const entities = (obj.entities || []).map((entity) => ({
+    postUri: uri.toString(),
+    startIndex: entity.index.start,
+    endIndex: entity.index.end,
+    type: entity.type,
+    value: entity.value,
+  }))
+  const post = {
+    uri: uri.toString(),
+    cid: cid.toString(),
+    creator: uri.host,
+    text: obj.text,
+    createdAt: obj.createdAt,
+    replyRoot: obj.reply?.root?.uri || null,
+    replyRootCid: obj.reply?.root?.cid || null,
+    replyParent: obj.reply?.parent?.uri || null,
+    replyParentCid: obj.reply?.parent?.cid || null,
+    indexedAt: timestamp || new Date().toISOString(),
   }
-  const notifs: Notification[] = []
+  const insertedPost = await db
+    .insertInto('post')
+    .values(post)
+    .onConflict((oc) => oc.doNothing())
+    .returningAll()
+    .executeTakeFirst()
+  let insertedEntities: PostTables.PostEntity[] = []
+  if (entities.length > 0) {
+    insertedEntities = await db
+      .insertInto('post_entity')
+      .values(entities)
+      .returningAll()
+      .execute()
+  }
+  return insertedPost
+    ? { post: insertedPost, entities: insertedEntities }
+    : null
+}
+
+const findDuplicate = async (): Promise<AtUri | null> => {
+  return null
+}
+
+const eventsForInsert = (obj: IndexedPost): Message[] => {
+  const notifs: Message[] = []
   for (const entity of obj.entities || []) {
     if (entity.type === 'mention') {
-      notifs.push({
-        userDid: entity.value,
-        author: uri.host,
-        recordUri: uri.toString(),
-        recordCid: cid.toString(),
-        reason: 'mention',
-      })
+      if (entity.value !== obj.post.creator) {
+        notifs.push(
+          messages.createNotification({
+            userDid: entity.value,
+            author: obj.post.creator,
+            recordUri: obj.post.uri,
+            recordCid: obj.post.cid,
+            reason: 'mention',
+          }),
+        )
+      }
     }
   }
-  if (obj.reply?.parent) {
-    const parentUri = new AtUri(obj.reply.parent.uri)
-    notifs.push({
-      userDid: parentUri.host,
-      author: uri.host,
-      recordUri: uri.toString(),
-      recordCid: cid.toString(),
-      reason: 'reply',
-      reasonSubject: parentUri.toString(),
-    })
+  if (obj.post.replyParent) {
+    const parentUri = new AtUri(obj.post.replyParent)
+    if (parentUri.host !== obj.post.creator) {
+      notifs.push(
+        messages.createNotification({
+          userDid: parentUri.host,
+          author: obj.post.creator,
+          recordUri: obj.post.uri,
+          recordCid: obj.post.cid,
+          reason: 'reply',
+          reasonSubject: parentUri.toString(),
+        }),
+      )
+    }
   }
   return notifs
 }
 
-export const makePlugin = (
-  db: Kysely<PartialDB>,
-): DbRecordPlugin<Post.Record, AppBskyPost> => {
-  return {
-    collection: type,
-    tableName,
-    validateSchema,
-    matchesSchema,
-    translateDbObj,
-    get: getFn(db),
-    insert: insertFn(db),
-    delete: deleteFn(db),
-    notifsForRecord,
-  }
+const deleteFn = async (
+  db: Kysely<DatabaseSchema>,
+  uri: AtUri,
+): Promise<IndexedPost | null> => {
+  const deleted = await db
+    .deleteFrom('post')
+    .where('uri', '=', uri.toString())
+    .returningAll()
+    .executeTakeFirst()
+  const deletedEntities = await db
+    .deleteFrom('post_entity')
+    .where('postUri', '=', uri.toString())
+    .returningAll()
+    .execute()
+  return deleted ? { post: deleted, entities: deletedEntities } : null
+}
+
+const eventsForDelete = (
+  deleted: IndexedPost,
+  replacedBy: IndexedPost | null,
+): Message[] => {
+  if (replacedBy) return []
+  return [messages.deleteNotifications(deleted.post.uri)]
+}
+
+export type PluginType = RecordProcessor<Post.Record, IndexedPost>
+
+export const makePlugin = (db: Kysely<DatabaseSchema>): PluginType => {
+  return new RecordProcessor(db, {
+    schemaId,
+    insertFn,
+    findDuplicate,
+    deleteFn,
+    eventsForInsert,
+    eventsForDelete,
+  })
 }
 
 export default makePlugin
